@@ -1,0 +1,242 @@
+/**
+ * Try-on engine for the in-GUI skin center.
+ *
+ * A skin's client bundle is executed through the REAL module system, not a
+ * shim: `;(0, eval)(bundle)` registers the factory on the page's own
+ * `window.__ModuleLoader__`, `window.__DSH_MODULES__.import(package)` (the
+ * kernel's ClientModuleSystem, contract C5/C6) materializes it — which
+ * auto-injects the skin's CSS `<style data-plugin>` tag — and
+ * `surface.apply(miniCtx)` mounts the skin exactly as the fiber system
+ * would, returning a full disposer. That makes try-on and its teardown the
+ * real code paths.
+ *
+ * Mutual exclusion: the GUI never hosts two skins at once. The currently
+ * ACTIVE skin is owned by its own cordis fiber (its disposer is not
+ * reachable), so try-on retracts the active skin's visual writes by recipe:
+ * remove its body attribute (its stylesheet goes inert), clear the
+ * body-level backdrop inline styles (blue-fantasy's whale art), detach the
+ * skin chrome body children (title/status bars — verified: at rest the only
+ * direct body children are #root and skin chrome), and neutralize known
+ * global-rule leaks (xp's sidebar taskbar/start). Everything is snapshotted
+ * and restored on exit. The active skin's own fiber is never touched, so
+ * exiting try-on returns the page to exactly the pre-try-on state.
+ *
+ * A ghost MutationObserver may survive retraction (blue-fantasy re-writes
+ * its backdrop on theme flips), so during try-on a neutralizing observer
+ * re-clears the backdrop props whenever `data-ds-dark-theme` changes.
+ */
+
+import { SKIN_CENTER_ENTRIES, type SkinCenterEntry } from './generated/skins.ts'
+
+/** Body-level backdrop properties skins may write inline (blue-fantasy). */
+const BACKDROP_PROPS = [
+  'background-image',
+  'background-position',
+  'background-size',
+  'background-attachment',
+  'background-repeat',
+] as const
+
+/**
+ * Per-skin neutralization CSS: rules that hide visual leaks whose styles
+ * are NOT scoped under the skin's body attribute (they live on app elements
+ * the skin touches, so detaching chrome cannot remove them). Matched by
+ * css-module class substring, which is stable across rebuilds.
+ */
+const NEUTRALIZE_CSS: Record<string, string> = {
+  // xp styles its start button + taskbar strip in the sidebar footer with
+  // top-level (unscoped) rules; its apply() removes them on dispose, but
+  // during try-on its ghost observer would re-add them, so hide instead.
+  xp: [
+    `[data-pane='sidebar'] [class*='xpTaskbar']{background:transparent!important;border-top:none!important;box-shadow:none!important}`,
+    `[data-pane='sidebar'] [class*='xpStart']{display:none!important}`,
+  ].join(''),
+}
+
+/** The window surfaces the boot protocol installs (manifest.ts contract). */
+interface SkinCenterWindow {
+  __DSH_BOOT__?: { entries?: Array<{ id: string }> }
+  __DSH_MODULES__?: {
+    import(specifier: string): Promise<unknown>
+    invalidate(id: string): void
+  }
+}
+
+/** Read the page's composed boot-graph entry ids (only enabled plugins appear). */
+function bootEntryIds(): string[] {
+  const boot = (window as SkinCenterWindow).__DSH_BOOT__
+  return boot?.entries?.map(entry => entry.id) ?? []
+}
+
+/** The skin package currently ACTIVE in the boot graph, if it is one of ours. */
+export function activeSkinEntry(): SkinCenterEntry | undefined {
+  const ids = new Set(bootEntryIds())
+  return SKIN_CENTER_ENTRIES.find(entry => ids.has(entry.package))
+}
+
+/** Minimal ctx the skins' apply() needs: cordis effect lifecycle only. */
+interface MiniCtx {
+  effect(callback: () => () => void, label?: string): () => void
+  /** Hidden handle for the controller: run the disposers in reverse order. */
+  __disposeAll(): void
+}
+
+function miniCtx(): MiniCtx {
+  const disposers: Array<() => void> = []
+  return {
+    effect(callback) {
+      disposers.push(callback())
+      return () => {}
+    },
+    __disposeAll(): void {
+      for (const dispose of disposers.reverse()) dispose()
+    },
+  }
+}
+
+/** Snapshot of the active skin's visual writes, restored on try-on exit. */
+interface ActiveVisuals {
+  skin: SkinCenterEntry | null
+  /** Attribute value before retraction (null = attribute absent). */
+  bodyAttr: string | null
+  /** body inline style before retraction (null = none). */
+  bodyStyle: string | null
+  /** Skin chrome elements detached from body (re-appended on exit). */
+  detached: HTMLElement[]
+  /** Neutralizes ghost backdrop writes while a try-on is live. */
+  clearObserver: MutationObserver | null
+  /** Hides global-rule leaks of the active skin (xp taskbar). */
+  neutralizeStyle: HTMLStyleElement | null
+}
+
+/**
+ * One live try-on session: owns the tried-on skin's disposer plus the
+ * captured active-skin visuals, and restores everything on exit.
+ */
+export class TryOnController {
+  private session: {
+    entry: SkinCenterEntry
+    dispose: () => void
+    active: ActiveVisuals
+  } | null = null
+
+  /** The skin currently being tried on, if any. */
+  get trying(): SkinCenterEntry | null {
+    return this.session?.entry ?? null
+  }
+
+  /** Start trying on `entry` (replaces any live session). */
+  async tryOn(entry: SkinCenterEntry): Promise<void> {
+    if (entry.package === activeSkinEntry()?.package) return
+    this.exit()
+
+    const active: ActiveVisuals = this.captureAndRetractActive()
+    try {
+      const dispose = await this.loadAndApply(entry)
+      this.session = { entry, dispose, active }
+    } catch (error) {
+      this.restoreActive(active)
+      throw error
+    }
+  }
+
+  /** Exit the live session: dispose the tried-on skin, then restore the active skin. */
+  exit(): void {
+    const session = this.session
+    if (session === null) return
+    this.session = null
+    session.dispose()
+    this.cleanupModule(session.entry)
+    this.restoreActive(session.active)
+  }
+
+  /** Execute + materialize + mount the target skin through the real loader. */
+  private async loadAndApply(entry: SkinCenterEntry): Promise<() => void> {
+    const modules = (window as SkinCenterWindow).__DSH_MODULES__
+    if (modules === undefined) throw new Error('skin-center: window.__DSH_MODULES__ missing')
+    const run = (): void => { ;(0, eval)(entry.bundle) }
+    try {
+      run()
+    } catch {
+      // Duplicate factory registration (a crashed earlier session): reset and retry once.
+      modules.invalidate(entry.package)
+      run()
+    }
+    const surface = await modules.import(entry.package)
+    const apply = (surface as { apply?: (ctx: unknown) => unknown }).apply
+    if (typeof apply !== 'function') {
+      throw new Error(`skin-center: "${entry.package}" client bundle exports no apply`)
+    }
+    const ctx = miniCtx()
+    apply(ctx)
+    return ctx.__disposeAll
+  }
+
+  /** Drop the tried-on module record + its injected style tag. */
+  private cleanupModule(entry: SkinCenterEntry): void {
+    const modules = (window as SkinCenterWindow).__DSH_MODULES__
+    modules?.invalidate(entry.package)
+    for (const el of document.querySelectorAll(`style[data-plugin=${JSON.stringify(entry.package)}]`)) {
+      el.remove()
+    }
+  }
+
+  /**
+   * Snapshot the active skin's visual writes and retract them so the tried-on
+   * skin can take over the whole surface.
+   */
+  private captureAndRetractActive(): ActiveVisuals {
+    const skin = activeSkinEntry() ?? null
+    const body = document.body
+    const bodyAttr = skin === null ? null : body.getAttribute(skin.bodyAttr)
+    if (skin !== null && bodyAttr !== null) body.removeAttribute(skin.bodyAttr)
+
+    const bodyStyle = body.getAttribute('style')
+    for (const prop of BACKDROP_PROPS) body.style.removeProperty(prop)
+
+    // The only direct body children besides #root are skin chrome
+    // (verified against the live GUI with the settings dialog open).
+    const detached: HTMLElement[] = []
+    for (const el of [...body.children] as HTMLElement[]) {
+      if (el.id === 'root') continue
+      el.remove()
+      detached.push(el)
+    }
+
+    // Neutralize a surviving ghost observer (blue-fantasy's backdrop
+    // re-writer) across theme flips during the try-on.
+    const clearObserver = new MutationObserver(() => {
+      for (const prop of BACKDROP_PROPS) body.style.removeProperty(prop)
+    })
+    clearObserver.observe(body, { attributes: true, attributeFilter: ['data-ds-dark-theme'] })
+
+    const neutralizeCss = skin === null ? undefined : NEUTRALIZE_CSS[skin.id]
+    const neutralizeStyle = neutralizeCss === undefined ? null : this.injectStyle(neutralizeCss)
+
+    return { skin, bodyAttr, bodyStyle, detached, clearObserver, neutralizeStyle }
+  }
+
+  /** Restore the active skin's captured visual state. */
+  private restoreActive(active: ActiveVisuals): void {
+    const body = document.body
+    if (active.skin !== null && active.bodyAttr !== null) {
+      body.setAttribute(active.skin.bodyAttr, active.bodyAttr)
+    }
+    if (active.bodyStyle !== null) {
+      body.setAttribute('style', active.bodyStyle)
+    } else {
+      body.removeAttribute('style')
+    }
+    body.append(...active.detached)
+    active.clearObserver?.disconnect()
+    active.neutralizeStyle?.remove()
+  }
+
+  private injectStyle(css: string): HTMLStyleElement {
+    const tag = document.createElement('style')
+    tag.dataset.skinCenterNeutralize = ''
+    tag.textContent = css
+    document.head.append(tag)
+    return tag
+  }
+}
