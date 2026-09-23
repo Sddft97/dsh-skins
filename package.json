@@ -29,12 +29,16 @@
       "platform": "web"
     }
   },
+  "packageManager": "pnpm@11.24.0",
   "scripts": {
     "build": "tsdown",
     "prepare": "tsdown",
     "watch": "tsdown --watch",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "skin-center:check": "node scripts/skin-center-catalog-check.cjs --check",
+    "skin-hooks:check": "node scripts/skin-hooks-registry.mjs --check",
+    "skin-hooks:write": "node scripts/skin-hooks-registry.mjs"
   },
   "license": "Apache-2.0",
   "dependencies": {
@@ -78,6 +82,6 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/zhu1090093659/dsh-web.git"
+    "url": "https://github.com/zhu1090093659/dsh-skins.git"
   }
 }
