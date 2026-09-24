@@ -1,0 +1,58 @@
+{
+  "comment": true,
+  "defaultRoute": {
+    "label": "Default owner: repository maintenance, docs and anything unlisted",
+    "reviewers": [
+      "zhu1090093659"
+    ],
+    "assignees": [
+      "zhu1090093659"
+    ]
+  },
+  "routes": [
+    {
+      "name": "renderer",
+      "label": "Wallpaper Engine / WebGL / renderer",
+      "paths": [
+        "src/we-*.ts",
+        "src/pkg-extract.ts",
+        "src/client/wallpaper.ts",
+        "src/client/WallpaperPanel.tsx"
+      ],
+      "title": "(wallpaper|webgl|scene player|scene runtime|pkg[-_ ]?extract|we[-_ ]?(library|routes|player|shim)|renderer)",
+      "reviewers": [],
+      "assignees": [
+        "Aa728848"
+      ]
+    },
+    {
+      "name": "skin-content",
+      "label": "Skin assets (skins/<id>/)",
+      "paths": [
+        "skins/**"
+      ],
+      "reviewers": [
+        "zhu1090093659"
+      ],
+      "assignees": [
+        "zhu1090093659"
+      ]
+    },
+    {
+      "name": "skin-center",
+      "label": "Skin center source (src/, contracts/, tests/)",
+      "paths": [
+        "src/**",
+        "contracts/**",
+        "tests/**",
+        "scripts/**"
+      ],
+      "reviewers": [
+        "zhu1090093659"
+      ],
+      "assignees": [
+        "zhu1090093659"
+      ]
+    }
+  ]
+}
