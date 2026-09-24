@@ -5,7 +5,7 @@
  * dsh-skin-new — scaffold a new skin for the dsh-web skin collection
  * (v2 pure asset directories, issue #506).
  *
- * Generates packages/skins/skin-center/skins/<name>/: a v2 skin.json
+ * Generates skins/<name>/: a v2 skin.json
  * (contracts/skin-manifest-v2.schema.json), a skin.css template with both
  * token suites (:root light values + body[data-ds-dark-theme] dark values,
  * --dsw-alias-* placeholders), a preview/ placeholder note, and bilingual
@@ -13,9 +13,9 @@
  * tsconfig, no build step; the skin-center package is the only loader.
  *
  * Usage:
- *   node scripts/dsh-skin-new <kebab-case-name>
+ *   node scripts/dsh-skin-new.cjs <kebab-case-name>
  *
- * See .dsh/skills/dsh-web-skin-developer/SKILL.md for the full workflow.
+ * See CONTRIBUTING.md for the submission flow.
  */
 
 const fs = require('node:fs')
@@ -72,7 +72,7 @@ function skinCss(name) {
     ' * you would for the official shell.',
     ' *',
     ' * Replace every placeholder value with your palette. The token list below is',
-    ' * a starter subset of packages/skins/skin-center/skins/mint/skin.css — copy',
+    ' * a starter subset of skins/mint/skin.css — copy',
     ' * more groups (state colors, buttons, shadows, scrollbars) from mint as',
     ' * needed. Need free selectors? Add patches.css and declare it as',
     ' * contributes.patches in skin.json (high sensitivity, disclosed in the UI).',
@@ -131,15 +131,16 @@ function previewReadme() {
   return [
     '# preview/ — 预览图占位',
     '',
-    '本目录需要两张真实截图，市场门禁（scripts/market-build）会校验它们存在：',
+    '本目录需要两张真实截图，市场门禁（dsh-web 的 scripts/market-build）会校验它们存在：',
     '',
     '- ' + BT + 'light.jpg' + BT + ' — 亮色主题预览',
     '- ' + BT + 'dark.jpg' + BT + ' — 暗色主题预览',
     '',
-    '拍完照后删除本 README。截图流程（需要 playwright + chromium）：',
+    '拍完照后删除本 README。截图流程在 dsh-web 检出里执行（需要 playwright + chromium）：',
     '',
     BT + BT + BT + 'sh',
-    'pnpm market:build                  # 先把皮肤注册进市场产物（market/dist）',
+    'pnpm market:fetch --local --force   # 用本目录的内容刷新市场输入',
+    'pnpm market:build                   # 重建 market/dist',
     'node scripts/capture-previews <id>  # 静态渲染皮肤样式表并重拍本目录的两张图',
     BT + BT + BT,
     '',
@@ -156,8 +157,9 @@ function readmeEn(name) {
     '',
     'English | [中文](README.zh.md)',
     '',
-    '<edit me: one-line pitch> — a skin for the dsh web GUI, shipped as a pure',
-    'asset directory inside the skin-center package.',
+    '<edit me: one-line pitch> — a skin for the dsh web GUI, kept as a pure asset',
+    'directory in this repository; the market publishes it, and the Workshop installs',
+    'it on demand into ' + BT + '$DSH_HOME/skins/' + name + '/' + BT + '.',
     '',
     '## What it is',
     '',
@@ -169,10 +171,12 @@ function readmeEn(name) {
     '',
     '## Preview',
     '',
+    'Rendered by the market build in a dsh-web checkout:',
+    '',
     BT + BT + BT + 'sh',
-    'pnpm market:build                            # refresh market/dist',
+    'pnpm market:fetch --local --force && pnpm market:build   # refresh market/dist from this directory',
     'open market/dist/preview.html?skin=' + name + '&theme=light',
-    'node scripts/capture-previews ' + name + '       # re-shoot preview/{light,dark}.jpg',
+    'node scripts/capture-previews ' + name + '               # re-shoot preview/{light,dark}.jpg',
     BT + BT + BT,
     '',
     '## Known limitations',
@@ -190,7 +194,7 @@ function readmeZh(name) {
     '',
     '[English](README.md) | 中文',
     '',
-    '<编辑：一句话卖点> —— dsh web GUI 皮肤，以纯资产目录形态内置在皮肤中心包内。',
+    '<编辑：一句话卖点> —— dsh web GUI 皮肤，纯资产目录保存在本仓；市场发布它，创意工坊按需安装到 ' + BT + '$DSH_HOME/skins/' + name + '/' + BT + '。',
     '',
     '## 是什么',
     '',
@@ -202,10 +206,12 @@ function readmeZh(name) {
     '',
     '## 预览',
     '',
+    '由 dsh-web 检出里的市场构建渲染：',
+    '',
     BT + BT + BT + 'sh',
-    'pnpm market:build                            # 刷新市场产物（market/dist）',
+    'pnpm market:fetch --local --force && pnpm market:build   # 用本目录内容刷新 market/dist',
     'open market/dist/preview.html?skin=' + name + '&theme=light',
-    'node scripts/capture-previews ' + name + '       # 重拍 preview/{light,dark}.jpg',
+    'node scripts/capture-previews ' + name + '               # 重拍 preview/{light,dark}.jpg',
     BT + BT + BT,
     '',
     '## 已知限制',
@@ -218,12 +224,12 @@ function readmeZh(name) {
 function main() {
   const name = process.argv[2]
   if (!name || !NAME_RE.test(name)) {
-    console.error('usage: node scripts/dsh-skin-new <kebab-case-name>  (e.g. dsh-skin-new matrix)')
+    console.error('usage: node scripts/dsh-skin-new.cjs <kebab-case-name>  (e.g. dsh-skin-new.cjs matrix)')
     process.exit(1)
   }
   const dir = path.join(SKINS_DIR, name)
   if (fs.existsSync(dir)) {
-    console.error('packages/skins/skin-center/skins/' + name + ' already exists — refusing to overwrite')
+    console.error('skins/' + name + ' already exists — refusing to overwrite')
     process.exit(1)
   }
 
@@ -249,18 +255,18 @@ function main() {
     fs.writeFileSync(path.join(dir, rel), text)
   }
 
-  console.log('scaffolded packages/skins/skin-center/skins/' + name + '/')
+  console.log('scaffolded skins/' + name + '/')
   console.log('')
   console.log('next steps:')
-  console.log('  1. edit packages/skins/skin-center/skins/' + name + '/skin.json  — 名称 / tagline / 描述 / tags / accent')
-  console.log('  2. edit packages/skins/skin-center/skins/' + name + '/skin.css   — 你的调色板（:root 亮色 + body[data-ds-dark-theme] 暗色）')
-  console.log('  3. node scripts/dsh-skin validate packages/skins/skin-center/skins/' + name + '  — v2 契约校验')
-  console.log('  4. pnpm market:build && open market/dist/preview.html?skin=' + name + '&theme=light  — 市场试穿（静态样式渲染）')
-  console.log('  5. node scripts/capture-previews ' + name + '  — 重拍 preview/{light,dark}.png 并删除 preview/README.md')
-  console.log('  6. pnpm skin-center:check && pnpm market:check  — 门禁')
-  console.log('  7. 提交（含 preview/ 与重新生成的 market/dist 产物）并发 PR')
+  console.log('  1. edit skins/' + name + '/skin.json  — 名称 / tagline / 描述 / tags / accent')
+  console.log('  2. edit skins/' + name + '/skin.css   — 你的调色板（:root 亮色 + body[data-ds-dark-theme] 暗色）')
+  console.log('  3. node scripts/dsh-skin.cjs validate skins/' + name + '  — v2 契约校验')
+  console.log('  4. pnpm skin-center:check  — 目录门禁（含样式安全管线）')
+  console.log('  5. pnpm test  — 仓库测试')
+  console.log('  6. 市场预览图：在 dsh-web 检出里跑 node scripts/capture-previews ' + name + '（写入本目录的 preview/，拍完删除 preview/README.md）')
+  console.log('  7. 按 CONTRIBUTING.md 提交并发 PR')
   console.log('')
-  console.log('完整流程见 .dsh/skills/dsh-web-skin-developer/SKILL.md')
+  console.log('完整流程见 CONTRIBUTING.md')
 }
 
 main()
