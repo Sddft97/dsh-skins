@@ -31,9 +31,9 @@
      towards paper white and read as an overlay; a warm neutral at a lower alpha
      darkens instead of washing, so the artwork keeps its depth and the reading
      surfaces stay the brightest thing on screen. */
-  --vd-stage-veil: #5d40482e;
-  --vd-stage-veil-edge: #5d40480f;
-  --vd-stage-veil-hero: #5d40480a;
+  --vd-stage-veil: #fffdfb38;
+  --vd-stage-veil-edge: #fffdfb14;
+  --vd-stage-veil-hero: #fffdfb0d;
   /* v1 applied these five official aliases through theme.overrideTokens
      (THEME_TOKENS in src/client/index.ts); v2 declares them here instead. */
   --dsw-alias-brand-primary: #8e2438;

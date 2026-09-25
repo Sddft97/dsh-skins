@@ -108,11 +108,25 @@ const RUNNING_ATTR = 'data-verdandi-running'
 const STAGE_SELECTOR = '[data-verdandi-stage]'
 const DECORATION_SELECTOR = '[data-verdandi-decoration]'
 const LEGACY_SELECTOR = '[data-verdandi-sidebar-card], [data-verdandi-wedding], [data-verdandi-chrome]'
-const SLIP_MARKER_SELECTOR = '[data-system-prompt-body]'
+const SLIP_MARKER_SELECTOR = '[data-system-prompt-body], [data-context-source], [data-context-summary]'
 const SIDEBAR_PANE = "[data-pane='sidebar']"
 const CONVERSATION_PANE = "[data-pane='conversation']"
 const DETAILS_PANE = "[data-pane='details']"
-const HEADER_SELECTOR = "[data-slot='conversation.session.header'] > header"
+/**
+ * The session header strip, in probe order. dsh 0.1.7 renders
+ * `<div data-slot='conversation.header' style='display:contents'><header>` and
+ * keeps `conversation.session.header` for the `display:contents` anchor that
+ * holds the title row and the tabs inside that header, so the old
+ * `[data-slot='conversation.session.header'] > header` child no longer exists.
+ * The three candidates are probed one at a time rather than as one comma list:
+ * a list resolves by document order, which picks the earlier anchor over its own
+ * header, and the anchor carries neither its own paint nor a box.
+ */
+const HEADER_SELECTORS = [
+  "[data-slot='conversation.header'] > header",
+  "[data-slot='conversation.session.header'] > header",
+  "[data-slot='conversation.session.header']:has(> header)",
+]
 const COMPOSER_SELECTOR = "[data-composer-seat], [data-slot='conversation.input.dock'], [data-slot='conversation.composer']"
 const STAGE_CLASS = 'vd-characterStage'
 const FIGURE_CLASS = 'vd-characterFigure'
@@ -182,6 +196,15 @@ function firstElement(selector) {
   return document.querySelector(selector)
 }
 
+function headerElement(root) {
+  if (!root) return null
+  for (const selector of HEADER_SELECTORS) {
+    const header = root.querySelector(selector)
+    if (header) return header
+  }
+  return null
+}
+
 function isRendered(element) {
   if (!element || element.hidden || element.getAttribute('aria-hidden') === 'true') return false
   const style = window.getComputedStyle(element)
@@ -212,7 +235,7 @@ function ensureWeddingDecorations(sidebar, conversation, details) {
   ensureDecoration(sidebarRoot, 'sidebar-veil-corners-top')
   ensureDecoration(sidebarRoot, 'sidebar-veil-corners-bottom')
   ensureDecoration(conversation, 'workspace-lace')
-  const header = conversation?.querySelector(HEADER_SELECTOR) ?? null
+  const header = headerElement(conversation)
   ensureDecoration(header, 'header-veil')
   ensureDecoration(header, 'header-namecard')
   ensureDecoration(header, 'header-bridal-corners')
@@ -313,7 +336,7 @@ function decorateLegibilityRows(conversation) {
 function decorateStableRegions() {
   clearOwnedHooks()
 
-  const header = firstElement(HEADER_SELECTOR)
+  const header = headerElement(document)
   header?.setAttribute('data-verdandi-header', '')
 
   const details = firstElement(DETAILS_PANE)
@@ -374,7 +397,7 @@ function setSidebarSize(body, sidebar) {
 
 function measureConversation(conversation) {
   const conversationRect = conversation.getBoundingClientRect()
-  const header = conversation.querySelector(HEADER_SELECTOR)
+  const header = headerElement(conversation)
   const composer = conversation.querySelector(COMPOSER_SELECTOR)
 
   const headerRect = header?.getBoundingClientRect()
@@ -401,7 +424,7 @@ function setStageWidth(stage, conversation) {
 
 function setConversationView(conversation) {
   const selectedTab = conversation.querySelector(
-    "[data-slot='conversation.session.header'] [role='tab'][aria-selected='true']",
+    "[data-verdandi-header] [role='tab'][aria-selected='true']",
   )
   const label = (selectedTab?.textContent ?? '').trim()
   const view = /^(轨迹|Trace)$/i.test(label) ? 'trace' : 'chat'
@@ -496,7 +519,7 @@ export default function defineSkinHooks() {
           sidebar,
           conversation,
           details,
-          conversation?.querySelector(HEADER_SELECTOR) ?? null,
+          headerElement(conversation),
           conversation?.querySelector("[data-composer-seat], [data-slot='conversation.input.dock']") ?? null,
         ])
       }
