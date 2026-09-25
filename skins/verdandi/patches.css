@@ -1126,29 +1126,17 @@ body[data-ds-dark-theme] [data-slot="conversation.chat.node"] > [class*="_userRo
   border-bottom: 1px solid color-mix(in srgb, var(--vd-gold) 42%, transparent);
 }
 
-/* The stock host titles this row with a full-width separator; in the skin's
-   language that reads as a soft gold rule fading out at both ends — one per
-   turn, under the chapter pill only (the running state keeps its own brighter
-   rule with the sweep riding it). */
-[data-pane="conversation"] [data-turn-process]:not([data-verdandi-running])::after {
-  content: "";
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--vd-gold) 42%, transparent) 18% 82%, transparent);
-  pointer-events: none;
-}
 
 [data-pane="conversation"] [data-turn-process] [class*="_label"] {
   position: relative;
   padding: 1px 18px 1px 10px;
   /* The turn-process row is the chapter that may fold many step groups inside
-     it, so it reads one step above the fold labels: full ink on opaque warm
-     paper capped by a solid gold ring — the translucent wash the fold labels
-     use read as "the same control" once both existed. */
-  color: var(--vd-ink);
+     it, so it reads one step above the fold labels: the title in the brand
+     colour on opaque warm paper — crimson in light, gold in dark through
+     the official token — with the fold labels staying in meta ink. The
+     hierarchy is exactly "the heading takes the brand colour, the entries
+     do not". */
+  color: var(--dsw-alias-brand-primary);
   font-weight: 600;
   letter-spacing: .015em;
   background-color: color-mix(in srgb, var(--vd-slip-solid) 94%, var(--vd-gold));
@@ -1160,7 +1148,7 @@ body[data-ds-dark-theme] [data-slot="conversation.chat.node"] > [class*="_userRo
      line of ink on a soft ground rather than as a filled bar. */
   background-image: linear-gradient(90deg, var(--vd-slip) 0%, color-mix(in srgb, var(--vd-slip) 88%, transparent) 58%, color-mix(in srgb, var(--vd-slip) 76%, transparent) 100%);
   border-radius: 6px;
-  border-left: 3px solid var(--vd-crimson);
+  border-left: 4px solid var(--vd-crimson);
   box-shadow: var(--vd-slip-shadow), 0 0 0 1px var(--vd-gold);
 }
 
@@ -1170,21 +1158,30 @@ body[data-ds-dark-theme] [data-slot="conversation.chat.node"] > [class*="_userRo
    gold badge with a slightly heavier stroke and a paint-level scale; the box
    stays 14px, so nothing around it moves. */
 [data-pane="conversation"] [data-turn-process] [class*="_chevron"] {
+  /* A paper disc inside a gold ring, matching the chapter pill's own ring
+     grammar. The arrow stays ink-dark in both themes — dark-on-paper reads
+     at ~12:1, and colouring it per-theme put near-white ink on gold in dark
+     mode, which is why the arrow vanished there. */
   color: var(--vd-ink);
-  background: var(--vd-gold);
+  background: var(--vd-slip-solid);
   border-radius: 999px;
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--vd-gold) 55%, transparent);
+  transition: box-shadow 0.15s ease;
   /* scale via the individual property: it composes with the host's own
      data-open rotation rule on this chevron, which a transform here would
      override — that override is exactly why the arrow stopped turning. */
   scale: 1.12;
 }
 
-[data-pane="conversation"] [data-turn-process] [class*="_chevron"] path {
-  stroke-width: 1.4px;
+/* Hover feedback is the ring brightening to full strength — no colour
+   inversion anywhere, so nothing can blend into anything. Scoped to the
+   whole chapter pill, which is the click target. */
+[data-pane="conversation"] [data-turn-process]:hover [class*="_chevron"] {
+  box-shadow: 0 0 0 2px var(--vd-gold);
 }
 
-[data-pane="conversation"] [data-turn-process]:hover [class*="_chevron"] {
-  color: color-mix(in srgb, var(--vd-gold) 72%, var(--vd-ink-meta));
+[data-pane="conversation"] [data-turn-process] [class*="_chevron"] path {
+  stroke-width: 1.4px;
 }
 
 [data-pane="conversation"] [data-turn-process]:hover {
@@ -1257,6 +1254,10 @@ body[data-ds-dark-theme] [data-slot="conversation.chat.node"] > [class*="_userRo
    the clock-bearing row out of the other action rows. Paint only, throughout. */
 [data-pane="conversation"] [data-turn-tail] [class*="_actions"]:has([class*="_time"]) {
   position: relative;
+  /* Constant, hover-independent padding: the host's own is 0 and the clock
+     hugged the pill's round edge. Padding moves the content within the
+     host's box, so the hover-reveal row stays jitter-free. */
+  padding-left: 10px;
   color: var(--vd-ink-meta);
   background: var(--vd-slip);
   border-radius: 999px;
@@ -1287,6 +1288,9 @@ body[data-ds-dark-theme] [data-slot="conversation.chat.node"] > [class*="_userRo
    and never touches its width, margin, padding or border. */
 [data-pane="conversation"] [data-clock="start"] {
   position: relative;
+  /* Same constant padding as the tail pill: the host's is 0 and the
+     timestamp hugged the round edge. */
+  padding-left: 10px;
   color: var(--vd-ink-meta);
   background: var(--vd-slip);
   border-radius: 999px;
