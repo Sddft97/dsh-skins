@@ -96,8 +96,8 @@ export const REVIEWED_SKIN_HOOKS: Readonly<Record<string, ReviewedSkinHooksIdent
   },
   "verdandi": {
     entry: "hooks.mjs",
-    manifestSha256: "b9e31d687a2cd2858b8a7a62d01d0e93ecf22d6473ea58decc0d461e5d96a17e",
-    hooksSha256: "1049f0662e221a5a2b3d0c177f7c86b4ec361d95151f0ac6d62025a4d4e40a52",
+    manifestSha256: "c7ffe2eb2444f4af3ec2c96d4d280bc69bade51a003ff3ab8780872127c30a0b",
+    hooksSha256: "53a891843945b726830d8759630664edd566e4c5f6958cef354528c440687f67",
   },
   "war-thunder": {
     entry: "hooks.mjs",

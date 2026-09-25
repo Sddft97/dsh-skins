@@ -26,9 +26,14 @@
   --vd-bare-ink: #1b1116;
   --vd-danger: #9c1f30;
   --vd-warn: #7d5310;
-  --vd-stage-veil: #fffdfb4d;
-  --vd-stage-veil-edge: #fffdfb1f;
-  --vd-stage-veil-hero: #fffdfb0f;
+  /* The stage veil compresses the artwork's range so bare ink survives it. In
+     light mode it used to be white (#fffdfb4d), which pushed the whole column
+     towards paper white and read as an overlay; a warm neutral at a lower alpha
+     darkens instead of washing, so the artwork keeps its depth and the reading
+     surfaces stay the brightest thing on screen. */
+  --vd-stage-veil: #5d40482e;
+  --vd-stage-veil-edge: #5d40480f;
+  --vd-stage-veil-hero: #5d40480a;
   /* v1 applied these five official aliases through theme.overrideTokens
      (THEME_TOKENS in src/client/index.ts); v2 declares them here instead. */
   --dsw-alias-brand-primary: #8e2438;
