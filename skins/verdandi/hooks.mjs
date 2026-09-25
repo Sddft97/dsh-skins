@@ -104,6 +104,7 @@ const CONVERSATION_PHASE_ATTR = 'data-verdandi-phase'
 const CONVERSATION_VIEW_ATTR = 'data-verdandi-view'
 const DETAILS_EMPTY_ATTR = 'data-verdandi-details-empty'
 const SLIP_ATTR = 'data-verdandi-slip'
+const RUNNING_ATTR = 'data-verdandi-running'
 const STAGE_SELECTOR = '[data-verdandi-stage]'
 const DECORATION_SELECTOR = '[data-verdandi-decoration]'
 const LEGACY_SELECTOR = '[data-verdandi-sidebar-card], [data-verdandi-wedding], [data-verdandi-chrome]'
@@ -123,6 +124,7 @@ const OWNED_HOOKS = [
   'data-verdandi-new-session',
   'data-verdandi-nav-entry',
   'data-verdandi-sidebar-action',
+  RUNNING_ATTR,
   DETAILS_EMPTY_ATTR,
 ]
 
@@ -321,12 +323,40 @@ function decorateStableRegions() {
     const label = `${button.getAttribute('aria-label') ?? ''} ${button.textContent ?? ''}`.trim()
     const text = (button.textContent ?? '').trim()
 
-    if (/^(新会话|New session)$/i.test(text)) button.dataset.verdandiNewSession = ''
+    // dsh 0.1.7 wraps the label in `newSessionLabel` / `newSessionContent` and
+    // appends a shortcut hint, so the button text is no longer the bare label.
+    // Match the stable class suffix first and keep the text rule for older shells.
+    if (/newSession/i.test(button.className) || /^(新会话|New session)$/i.test(text)) {
+      button.dataset.verdandiNewSession = ''
+    }
     if (/^(任务看板|Task board|SSH|技能中心|Skill center)$/i.test(text)) button.dataset.verdandiNavEntry = ''
     if (/搜索会话|Search sessions|视图选项|View options|添加工作区|Add workspace/i.test(label)) {
       button.dataset.verdandiSidebarAction = ''
     }
   }
+}
+
+/**
+ * Mark the turn-process control while its turn is actually running.
+ *
+ * dsh 0.1.7 moved the live status into that control and switches its label copy
+ * with the turn state (running / worked / took / failed), so the skin's copy
+ * swap has to be scoped by state instead of by the removed `_turnStatus` class.
+ * Only the running label is marked, so the finished states keep the host wording.
+ * @param conversation - Visible conversation pane, or null when unrendered.
+ */
+function markRunningStatus(conversation) {
+  const running = conversation
+    ? [...conversation.querySelectorAll('[data-turn-process]')].filter((node) => {
+      const text = (node.querySelector("[class*='_label']")?.textContent ?? '').trim()
+      return /^(深度求索中|Deep diving)/i.test(text)
+    })
+    : []
+
+  for (const marked of document.querySelectorAll(`[${RUNNING_ATTR}]`)) {
+    if (!running.includes(marked)) marked.removeAttribute(RUNNING_ATTR)
+  }
+  for (const node of running) node.setAttribute(RUNNING_ATTR, '')
 }
 
 function setSidebarSize(body, sidebar) {
@@ -438,6 +468,7 @@ export default function defineSkinHooks() {
         setSidebarSize(body, sidebar)
         ensureWeddingDecorations(sidebar, workspaceVisible ? conversation : null, details)
         decorateLegibilityRows(workspaceVisible ? conversation : null)
+    markRunningStatus(workspaceVisible ? conversation : null)
 
         if (workspaceVisible) {
           const stage = ensureCharacterStage(conversation)
