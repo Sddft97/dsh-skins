@@ -1129,12 +1129,13 @@ body[data-ds-dark-theme] [data-slot="conversation.chat.node"] > [class*="_userRo
   position: relative;
   padding: 1px 18px 1px 10px;
   /* The turn-process row is the chapter that may fold many step groups inside
-     it, so it reads one step above the fold labels: full ink instead of meta,
-     and the wash capped by a gold hairline ring so the two levels never look
-     like the same control. */
+     it, so it reads one step above the fold labels: full ink on opaque warm
+     paper capped by a solid gold ring — the translucent wash the fold labels
+     use read as "the same control" once both existed. */
   color: var(--vd-ink);
   font-weight: 600;
   letter-spacing: .015em;
+  background-color: color-mix(in srgb, var(--vd-slip-solid) 94%, var(--vd-gold));
   /* The artwork behind a transcript row can be near-black — measured at 1.37:1
      for bare ink over the darkest band — so the copy keeps a paper wash that
      follows it. The wash eases towards the row's end but never reaches
@@ -1143,7 +1144,7 @@ body[data-ds-dark-theme] [data-slot="conversation.chat.node"] > [class*="_userRo
      line of ink on a soft ground rather than as a filled bar. */
   background-image: linear-gradient(90deg, var(--vd-slip) 0%, color-mix(in srgb, var(--vd-slip) 88%, transparent) 58%, color-mix(in srgb, var(--vd-slip) 76%, transparent) 100%);
   border-radius: 6px;
-  box-shadow: var(--vd-slip-shadow), 0 0 0 1px var(--vd-slip-line);
+  box-shadow: var(--vd-slip-shadow), 0 0 0 1px var(--vd-gold);
 }
 
 /* The fold indicator sits at the chapter pill's tail. The host draws it as a
@@ -1156,6 +1157,13 @@ body[data-ds-dark-theme] [data-slot="conversation.chat.node"] > [class*="_userRo
   background: color-mix(in srgb, var(--vd-gold) 26%, transparent);
   border-radius: 999px;
   transform: scale(1.12);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--vd-gold) 55%, transparent);
+}
+
+/* The host ships no rotation rule for this chevron at all, so the expanded
+   state is articulated here off the disclosure's own aria-expanded. */
+[data-pane="conversation"] [data-turn-process] :is([aria-expanded="true"], [data-expanded="true"]) [class*="_chevron"] {
+  transform: rotate(180deg) scale(1.12);
 }
 
 [data-pane="conversation"] [data-turn-process] [class*="_chevron"] path {
@@ -1182,13 +1190,13 @@ body[data-ds-dark-theme] [data-slot="conversation.chat.node"] > [class*="_userRo
    row above, and the label is addressed through the host's own
    `[data-process-activity]` anchor so tool titles inside the expanded body are
    never caught by it. */
-[data-pane="conversation"] [data-step-process][data-chat-paging-anchor] {
-  /* Only the folded group is a chapter boundary; the expanded group is just a
-     container and must not draw a second rule inside the transcript. */
-  padding-bottom: 6px;
-  border-bottom: 1px solid color-mix(in srgb, var(--vd-gold) 30%, transparent);
-}
-
+/* The gold hairline an earlier revision drew under
+   `[data-step-process][data-chat-paging-anchor]` was removed on purpose: every
+   step row carries that anchor — the rows inside an expanded body and the
+   virtualizer's compressed stubs included — so the rule produced a ladder of
+   gold lines under the fold (loudest in dark mode), and a hairline that cannot
+   tell a chapter boundary from any other row is not worth its cost. The fold
+   labels' wash pills carry the chapter language instead. */
 [data-pane="conversation"] [data-step-process] [data-process-activity] {
   position: relative;
   padding: 1px 12px 1px 10px;
@@ -1297,8 +1305,21 @@ body[data-ds-dark-theme] [data-slot="conversation.chat.node"] > [class*="_userRo
 [data-pane="conversation"] [data-clock="start"] [class*="_bubble"],
 [data-pane="conversation"] [data-turn-tail] [class*="_actions"] [class*="_bubble"] {
   position: absolute;
-  right: 0;
+  /* The host's script leaves page-coordinate inline left/top on this bubble
+     from another positioning mode; they only activate once the bubble is
+     absolute, and resolve against whatever wrapper happens to be positioned,
+     so they are neutralised and the bubble is anchored here instead: centred
+     on the copy button (28px at the row's right edge — a 58px bubble needs
+     15px of overhang), above the row. The z-index lifts it over the message
+     card it overlaps; pointer-events: none keeps it from stealing the hover.
+     The !important pair beats the inline left/top; !important on author
+     declarations outranks inline non-important ones. */
+  left: auto !important;
+  top: auto !important;
+  transform: none;
+  right: -15px;
   bottom: calc(100% + 6px);
+  z-index: 30;
   pointer-events: none;
   white-space: nowrap;
 }
