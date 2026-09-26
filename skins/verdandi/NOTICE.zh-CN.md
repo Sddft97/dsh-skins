@@ -1,6 +1,6 @@
 # 素材与第三方权利说明
 
-**语言 / Language：** [English](THIRD_PARTY_NOTICES.md) | [简体中文](THIRD_PARTY_NOTICES.zh-CN.md)
+**语言 / Language：** [English](NOTICE) | [简体中文](NOTICE.zh-CN.md)
 
 英文版是本仓库的主要声明文本，本简体中文译文仅为方便阅读。本文件用于区分本仓库的 MIT 代码与《深空之眼》游戏素材。它不是原权利人的授权文件，也不改变任何素材原有的权利状态。
 

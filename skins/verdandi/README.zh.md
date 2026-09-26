@@ -16,10 +16,11 @@
   使用 `scripts/dsh-skin-migrate-v2.mjs`。这里的 19 张栅格美术与 v1 bundle
   内联的常量逐字节相同；6 个 SVG 装饰出于同样原因仍以 data URI 内联在
   `hooks.mjs` 里。
-- **栅格美术由 `assets/` 提供**：v2 管线把送达的 CSS 内联进 `<style>` 标签且
-  不重写相对 `url()`，相对 `assets/...` 会以文档为基址解析从而 404。因此由
-  hooks 用 `ctx.assetBase` 设置 27 个 `--vd-art-*` body 变量，位置与 v1 插件
-  用内联 data URI 设置的位置完全一致。
+- **栅格美术由 `assets/` 提供**：皮肤中心把送达的样式表以 `<link
+  rel="stylesheet">` 元素安装（内联进 `<style>` 会破坏资源解析），CSS 有意把
+  所有栅格引用排除在相对 `url()` 解析之外。hooks 用 `ctx.assetBase` 以指向皮肤
+  资产路由的绝对 URL 设置 27 个 `--vd-art-*` body 变量，位置与 v1 插件用内联
+  data URI 设置的位置完全一致。
 - **类名已稳定**：v1 构建把 CSS-module 哈希（`DqQE8W_characterStage`）烤进了
   样式表与运行时；这里改为皮肤自有的 `vd-characterStage`、`vd-characterFigure`、
   `vd-figureLeft`、`vd-figureRight`，`patches.css` 与 hooks 使用同一组名字。
@@ -64,4 +65,4 @@ Harness 官方均无隶属或授权关系。
 
 ## 预览
 
-`preview/light.png` 与 `preview/dark.png` 是创意工坊画廊使用的试穿渲染图。
+`preview/light.jpg` 与 `preview/dark.jpg` 是创意工坊画廊使用的试穿渲染图。

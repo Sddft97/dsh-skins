@@ -18,11 +18,13 @@ interaction hairlines. Light and dark schemes are both first-class.
   with `scripts/dsh-skin-migrate-v2.mjs`. The 19 raster artworks shipped here
   are byte-identical to the constants the v1 bundle inlined; the 6 SVG
   ornaments stay inline data URIs inside `hooks.mjs` for the same reason.
-- **Raster art is served from `assets/`**: the v2 pipeline inlines served CSS
-  into a `<style>` tag without rewriting relative `url()`, so a relative
-  `assets/...` reference would resolve against the document base and 404. The
-  hooks therefore set the 27 `--vd-art-*` body variables from `ctx.assetBase`,
-  exactly where the v1 plugin set them from inline data URIs.
+- **Raster art is served from `assets/`**: the skin center installs the served
+  stylesheets as `<link rel="stylesheet">` elements (inlining into `<style>`
+  would break asset resolution), and the CSS deliberately keeps every raster
+  reference out of relative-`url()` resolution. The hooks set the 27
+  `--vd-art-*` body variables from `ctx.assetBase` as absolute URLs into the
+  skin's asset route, exactly where the v1 plugin set them from inline data
+  URIs.
 - **Class names are stable**: the v1 build baked CSS-module hashes
   (`DqQE8W_characterStage`) into the stylesheet and the runtime. Here they are
   the skin-owned names `vd-characterStage`, `vd-characterFigure`,
@@ -81,5 +83,5 @@ affiliated with the game's rights holders or with DeepSeek Harness.
 
 ## Preview
 
-`preview/light.png` and `preview/dark.png` are the try-on renders used by the
+`preview/light.jpg` and `preview/dark.jpg` are the try-on renders used by the
 Workshop gallery.
