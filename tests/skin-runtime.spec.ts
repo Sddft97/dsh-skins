@@ -231,6 +231,19 @@ describe('shared shell rendering adapter (#954)', () => {
     expect(metrics!).toContain('margin-bottom: var(--dsh-composer-accessory-gap, 4px)')
   })
 
+  it('resets backdrop-filter to none on the sibling accessory seat to prevent containing-block tooltip overflow (issue #1757 / #21)', () => {
+    // Given the shared shell-rendering stylesheet
+    const css = shellRenderingCss()
+    // When an accessory is seated beside the composer dock (0.1.7 ContextMeter)
+    // Then backdrop-filter is reset to none so it does not become a containing block
+    // for position:fixed hover tooltips or detail panels
+    const blocks = [...css.matchAll(/\[data-slot="conversation\.composer\.dock"\] \+ \*[^{]*\{([^}]*)\}/gs)]
+      .map(match => match[1])
+    const resetBlock = blocks.find(b => b.includes('backdrop-filter: none !important'))
+    expect(resetBlock, 'sibling accessory seat must reset backdrop-filter to none').toBeDefined()
+    expect(resetBlock).toContain('-webkit-backdrop-filter: none !important')
+  })
+
   it('keeps the wide goal dock transparent and lets its compact inner bar paint', () => {
     const css = shellRenderingCss()
     expect(css).toContain('[data-slot="conversation.input.dock"] > [data-goal-bar="true"][data-goal-bar="true"][data-goal-bar="true"]')
