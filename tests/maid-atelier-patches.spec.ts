@@ -170,3 +170,18 @@ describe('maid-atelier plugin manager top-trim yield (#1742)', () => {
     expect(selectorList).not.toContain('[class*=')
   })
 })
+
+describe('maid-atelier desktop whole-window frame transparency (#1763)', () => {
+  it('sets transparent background on the whole-window frame element', () => {
+    const declarations = block('[class*="_frame"]')
+    expect(declarations).toContain('background: transparent !important')
+  })
+})
+
+describe('maid-atelier desktop titlebar brand svg sizing (#1763)', () => {
+  it('restores fixed height and flex none on titlebar-brand svg', () => {
+    const declarations = block('[data-skin-chrome="titlebar-brand"] svg')
+    expect(declarations).toContain('height: 18px')
+    expect(declarations).toContain('flex: none')
+  })
+})

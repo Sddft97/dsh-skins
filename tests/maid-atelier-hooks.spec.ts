@@ -103,4 +103,24 @@ describe('maid-atelier hooks: character stage and decorative elements', () => {
     expect(document.body.querySelector('[data-skin-chrome="bottom-trim"]')).toBeNull()
     expect(document.body.style.getPropertyValue('--maid-top-trim-art')).toBe('')
   })
+
+  it('mounts titlebar brand onto desktop frame element and positions it vertically centered in titlebar height (#1763)', () => {
+    const frame = document.createElement('div')
+    frame.className = 'ZTP-Xa_frame'
+    document.body.appendChild(frame)
+
+    const { ctx, runCleanup } = setup()
+    document.documentElement.setAttribute('data-windows-titlebar', '')
+    document.body.appendChild(frame)
+
+    defineSkinHooks().apply(ctx)
+
+    const brand = frame.querySelector('[data-skin-chrome="titlebar-brand"]') as HTMLElement
+    expect(brand).not.toBeNull()
+    expect(brand.style.top).toBe('calc(var(--dsh-windows-titlebar-height, 40px) / 2)')
+
+    runCleanup()
+    document.documentElement.removeAttribute('data-windows-titlebar')
+    frame.remove()
+  })
 })
