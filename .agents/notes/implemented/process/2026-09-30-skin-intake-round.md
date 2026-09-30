@@ -48,23 +48,31 @@ count, the brand row's dead `display: contents` rule, the new-session hover
 overlap, and the settings panel's border count). Merged as `95ae44d`,
 `4db2a3c9` and `b2de859`.
 
-**#24 and #26 were held with changes requested.** Both are otherwise sound
-submissions that pass the aesthetic gate, and both fail the attribution gate on
-the same class of gap — the record does not classify where the artwork comes
-from, and neither states that the contributor carries the copyright and
-compliance responsibility:
+**#26 and #24 were held with changes requested; #26 was merged later the same
+round after the contributor answered.** Both are otherwise sound submissions
+that pass the aesthetic gate, and both failed the attribution gate on the same
+class of gap — the record did not classify where the artwork comes from, and
+neither stated that the contributor carries the copyright and compliance
+responsibility:
 
 - #24 (endfield-baker) declares the skin engineering as the contributor's own,
   the base theme as adapted from `blue-fantasy`, and the Endfield names as
   Hypergryph's with a non-commercial fan-work position, but it does not say
   whether the assets are original, AI-generated or adapted from official
   material, and it does not carry the unofficial / unrelated-to-this-repository
-  / personal-non-commercial wording the gate asks for.
-- #26 (national-day) contradicts itself on provenance: `skin.json` says the two
-  backdrop paintings were supplied by the author while the pull request
-  description calls them "用户给的一对画", and neither classifies them. The
-  aesthetic verdict is a pass: two independent palettes, the figure uncropped,
-  readable panel contrast, no banding, watermark or seam.
+  / personal-non-commercial wording the gate asks for. Still open.
+- #26 (national-day) contradicted itself on provenance: `skin.json` said the
+  two backdrop paintings were supplied by the author while the pull request
+  description called them "用户给的一对画", and neither classified them. The
+  aesthetic verdict was a pass: two independent palettes, the figure uncropped,
+  readable panel contrast, no banding, watermark or seam. The contributor
+  answered within the hour (commits `1ee86f4`, `54e7b7f`) with the missing
+  classification taken from the source files rather than from inference — the
+  unmodified PNGs carry an OpenAI-issued C2PA manifest (`softwareAgent =
+  ChatGPT / gpt-image`, `digitalSourceType = trainedAlgorithmicMedia`), so the
+  backdrops are AI-generated, and the responsibility wording landed in
+  `skin.json` and both READMEs. Verified against the head and merged as
+  `7592bce`.
 
 **Green CI is not self-serving.** #18's and #24's workflow runs were sitting in
 **Action required** because both authors are first-time contributors; the round
@@ -99,12 +107,13 @@ had failed with **zero jobs** (a run that never started, not a test failure).
 
 ## Consequences
 
-- The catalog gains meridian and rainy-night and the desktop frame rule reaches
-  nine skins; the dsh-web pin and `market/dist` move in one landing commit on
-  `origin/dev`, so the store content follows this merge, not the other way
-  round.
-- #24 and #26 stay open with the blocking items named in the pull request, so
-  each contributor has one place to act on.
+- The catalog gains meridian, rainy-night and national-day and the desktop frame
+  rule reaches nine skins; the dsh-web pin and `market/dist` move in one landing
+  commit on `origin/dev` once the re-bake lands, so the store content follows
+  these merges, not the other way round.
+- #24 stays open with its blocking items named in the pull request, so the
+  contributor has one place to act on. #26's contributor acted on theirs inside
+  the round and the merge followed.
 - Every push to `main` here is a squash merge; the history stays linear and the
   previous bakes of #16's video stop being reachable.
 - A first-time contributor's CI needs an explicit approval before it can be
