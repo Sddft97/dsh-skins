@@ -30,7 +30,12 @@ action CI cannot self-serve: a first-time contributor's workflow run stays in
   `display: contents` session-header regression in `whale-fantasy` landed in the
   same pull request (`61927c8`, the glass moves onto the element that owns the
   band's box); the shipped blob went 48,520,965 -> 32,494,969 bytes. Merged as
-  `b571783`.
+  `b571783`. **The accepted bake turned out not to be publishable**: the store
+  ships a skin as one zip asset and Cloudflare Workers caps a single asset at
+  25 MiB, while this skin's zip is 33,027,261 bytes, so the dsh-web landing was
+  reverted and the contributor was asked to re-bake below the ceiling (see the
+  comment on this pull request; the dsh-web side of that decision is recorded in
+  that repository's market-asset-size-cap note).
 
 **#23, #25 and #27 were merged.** All three are skin-side desktop/UI fixes whose
 evidence is a real before/after capture pair, and all three were verified
@@ -75,7 +80,10 @@ had failed with **zero jobs** (a run that never started, not a test failure).
   between the two bakes is 0.0017 SSIM while the cost difference is 2x, so the
   request was not worth another round trip once the squash was on the table -
   but the acceptance is recorded here with its number rather than left implicit,
-  because it is a departure from what the previous round asked for.
+  because it is a departure from what the previous round asked for. **That call
+  was wrong**: the 32.49 MB bake cannot be published at all, so the size the
+  earlier round asked for was not a preference but the ceiling, and the
+  author's own 16,549,139-byte bake is the one that clears it.
 - **Merge #24 and #26 and ask for the attribution wording afterwards.**
   Rejected. The gate makes the declaration a precondition of the merge, and in
   #26 it is a factual contradiction about who made the artwork, not a formality.
