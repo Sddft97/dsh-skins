@@ -35,7 +35,11 @@ action CI cannot self-serve: a first-time contributor's workflow run stays in
   25 MiB, while this skin's zip is 33,027,261 bytes, so the dsh-web landing was
   reverted and the contributor was asked to re-bake below the ceiling (see the
   comment on this pull request; the dsh-web side of that decision is recorded in
-  that repository's market-asset-size-cap note).
+  that repository's market-asset-size-cap note). The contributor delivered the
+  re-bake as #28 - the same 2026-09-29 master at CRF 24, 16,974,454 bytes zipping
+  to 17,507,847 bytes, with the readme/manifest numbers carried along and the
+  withdrawn CRF 19 row kept in the comparison table - which was merged as
+  `493f81c7` and unblocked the landing.
 
 **#23, #25 and #27 were merged.** All three are skin-side desktop/UI fixes whose
 evidence is a real before/after capture pair, and all three were verified
