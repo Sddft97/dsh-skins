@@ -107,6 +107,11 @@ export function boundConfigForm<T>(
   let boundId: string | undefined
   let offBound: (() => void) | undefined
   let subscribedToMirror = false
+  // Re-entrancy guard: getSnapshot() lazily binds, bind() publishes, and a
+  // listener that reads the form while the mirror is still unanswered would
+  // otherwise re-enter bind() -> publish() -> getSnapshot() until the stack
+  // overflows (the apply then throws and the whole web boot fails).
+  let binding = false
 
   const resolve = (): string | null => {
     return servedEntryId(forms, candidates)
@@ -119,30 +124,41 @@ export function boundConfigForm<T>(
   }
 
   const bind = (): void => {
-    ensureMirrorSubscription()
-    const target = resolve()
-    if (target === boundId) return
-    offBound?.()
-    offBound = undefined
-    if (target === null) {
-      boundId = undefined
-      bound = undefined
-      publish()
-      return
-    }
-    let form: ConfigForm<T>
+    if (binding) return
+    binding = true
     try {
-      form = forms.get<T>(target)
-    } catch {
-      boundId = undefined
-      bound = undefined
+      ensureMirrorSubscription()
+      const target = resolve()
+      if (target === boundId) return
+      offBound?.()
+      offBound = undefined
+      if (target === null) {
+        // Unbinding is a change only when something was bound; an unanswered
+        // mirror leaving the form unbound must not publish (the publish would
+        // re-enter this bind through any listener reading the form).
+        const hadBinding = bound !== undefined
+        boundId = undefined
+        bound = undefined
+        if (hadBinding) publish()
+        return
+      }
+      let form: ConfigForm<T>
+      try {
+        form = forms.get<T>(target)
+      } catch {
+        const hadBinding = bound !== undefined
+        boundId = undefined
+        bound = undefined
+        if (hadBinding) publish()
+        return
+      }
+      boundId = target
+      bound = form
+      offBound = form.subscribe(() => { publish() })
       publish()
-      return
+    } finally {
+      binding = false
     }
-    boundId = target
-    bound = form
-    offBound = form.subscribe(() => { publish() })
-    publish()
   }
 
   const ensureMirrorSubscription = (): void => {

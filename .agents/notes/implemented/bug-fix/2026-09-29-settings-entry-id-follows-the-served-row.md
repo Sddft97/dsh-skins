@@ -70,6 +70,27 @@ The report's other request — name the namespace and refusal reason in the erro
 without printing user values — is `CustomThemeController.sectionState()`, which
 reports status, writability, mode, and revision only.
 
+## Deferred binding (#1769) and its recursion fix (2026-09-30)
+
+Under an aggregate install the fallback guess itself was wrong: the aggregate
+profile has no `ui-skin-center` row at all, so freezing any id before the
+mirror answers addresses a row the Host does not serve. `boundConfigForm()`
+therefore defers: while the mirror is unanswered the form reports
+`unavailable` and refuses writes, and the moment the describe mirror answers it
+binds whichever row the Host actually serves and notifies subscribers.
+
+The first deferred version crashed the whole web boot. `getSnapshot()` lazily
+calls `bind()`, and `bind()` published on every unresolved pass (a `null`
+target never equals the `undefined` sentinel), so a listener that reads the
+form from its own notification — the boot reconcile loop does exactly that —
+re-entered `bind() -> publish() -> getSnapshot()` until the stack overflowed;
+`apply` threw, the fiber failed, and the boot page rendered
+`1 entry did not activate`. `bind()` now runs under a re-entrancy guard and
+publishes only when the binding actually changed (unbinding a bound form, or
+binding a resolved row). The regression test subscribes a listener that reads
+the form while the mirror is unanswered and asserts the read completes without
+notifying.
+
 ## Alternatives considered
 
 - **Wait for the mirror before binding.** The SDK's `whileServed()` can defer a

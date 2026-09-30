@@ -188,6 +188,21 @@ describe('the skin center binds the entry row the Host actually serves', () => {
     expect(listener).toHaveBeenCalled()
   })
 
+  it('does not recurse when a subscriber reads the form while the mirror is unanswered', () => {
+    // Given an unanswered mirror and a subscriber that reads the form from
+    // inside its notification (the boot reconcile loop does exactly this)
+    const { forms } = fakeForms(null)
+    const form = bindConfigForm(forms)
+    const listener = vi.fn(() => { form.getSnapshot() })
+    form.subscribe(listener)
+
+    // When the form is read, lazily binding while the mirror is unanswered,
+    // Then the read completes instead of recursing bind -> publish -> read
+    // until the stack overflows (which failed the plugin's apply on boot)
+    expect(() => form.getSnapshot()).not.toThrow()
+    expect(listener).not.toHaveBeenCalled()
+  })
+
   it('reports an unknown entry id when the mirror cannot answer', () => {
     // Given an unreadable mirror
     const { forms } = fakeForms(null)
