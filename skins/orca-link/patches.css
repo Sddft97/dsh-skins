@@ -255,6 +255,26 @@ body[data-orca-cordis-panel-open] [data-cordis-panel] {
   border-radius: 0 !important;
 }
 
+/* The reset above squares the dialog chrome, but a panel hosted inside the
+   dialog owns its own card grammar and must keep it. The skin-center rows
+   are the case in hand: the status badge lost its pill and read as a
+   clipped block against the card, and the action buttons lost the rounded
+   shape that separates them from the card surface. Each element is given
+   the radius its own component module declares; the dialog around them
+   stays square. A `revert` cannot express this -- it would discard the
+   panel's own declaration along with the blanket reset. */
+body[data-dsh-skin-center] [class*="_card"] {
+  border-radius: 8px;
+}
+
+body[data-dsh-skin-center] [class*="_badge"] {
+  border-radius: 999px;
+}
+
+body[data-dsh-skin-center] [class*="_button"] {
+  border-radius: 6px;
+}
+
 @media (width >= 1100px) and (height >= 681px) {
   body[data-orca-settings-open] [data-slot="sidebar.settings"] > [role="presentation"] {
     justify-content: flex-start;
