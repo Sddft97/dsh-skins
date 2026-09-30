@@ -210,7 +210,7 @@ body[data-ds-dark-theme] [role="dialog"] {
   --orca-dialog-bg: #0f151f;
 }
 
-body[data-orca-settings-open] [data-slot="sidebar.settings"] > [role="presentation"] {
+body[data-orca-settings-open] [data-dsh-surface="settings"]:has(> nav) {
   z-index: var(--orca-settings-overlay-z);
   isolation: isolate;
   box-sizing: border-box;
@@ -220,12 +220,12 @@ body[data-orca-settings-open] [data-slot="sidebar.settings"] > [role="presentati
   inset: 0;
 }
 
-body[data-orca-settings-open] [data-slot="sidebar.settings"] > [role="presentation"] > :first-child {
+body[data-orca-settings-open] [data-dsh-surface="settings"]:has(> nav) > [class*="_mask"] {
   z-index: 0;
   animation: .17s ease-out both orca-ch-orcaSettingsMaskIn;
 }
 
-body[data-orca-settings-open] [data-slot="sidebar.settings"] > [role="presentation"] > [role="dialog"] {
+body[data-orca-settings-open] [data-dsh-surface="settings"] {
   z-index: 1;
   border: 1px solid var(--orca-line);
   width: min(800px, 100vw - 48px);
@@ -251,7 +251,7 @@ body[data-orca-cordis-panel-open] [data-cordis-panel] {
   z-index: var(--orca-z-cordis);
 }
 
-[data-slot="sidebar.settings"] [role="dialog"] *, [data-slot="sidebar.settings"] [role="dialog"] :before, [data-slot="sidebar.settings"] [role="dialog"] :after {
+[data-dsh-surface="settings"] *, [data-dsh-surface="settings"] :before, [data-dsh-surface="settings"] :after {
   border-radius: 0 !important;
 }
 
@@ -276,26 +276,26 @@ body[data-dsh-skin-center] [class*="_button"] {
 }
 
 @media (width >= 1100px) and (height >= 681px) {
-  body[data-orca-settings-open] [data-slot="sidebar.settings"] > [role="presentation"] {
+  body[data-orca-settings-open] [data-dsh-surface="settings"]:has(> nav) {
     justify-content: flex-start;
     align-items: flex-end;
     padding: 18px 18px 18px 72px;
   }
 
-  body[data-orca-sidebar-wide] [data-slot="sidebar.settings"] > [role="presentation"] {
+  body[data-orca-sidebar-wide] [data-dsh-surface="settings"] {
     padding-left: calc(var(--orca-sidebar-width) + 16px);
   }
 
-  body[data-orca-settings-open] [data-slot="sidebar.settings"] > [role="presentation"] > [role="dialog"] {
+  body[data-orca-settings-open] [data-dsh-surface="settings"]:has(> nav) {
     width: min(760px, 100vw - 108px);
     height: min(680px, 100vh - 36px);
   }
 
-  body[data-orca-sidebar-wide] [data-slot="sidebar.settings"] > [role="presentation"] > [role="dialog"] {
+  body[data-orca-sidebar-wide] [data-dsh-surface="settings"] {
     width: min(760px, calc(100vw - var(--orca-sidebar-width) - 34px));
   }
 
-  body[data-orca-settings-open] [data-slot="sidebar.settings"] > [role="presentation"] > [role="dialog"] > nav {
+  body[data-orca-settings-open] [data-dsh-surface="settings"] > nav {
     border-right: 1px solid var(--orca-line);
     justify-content: flex-start;
     padding-bottom: 24px;
@@ -308,22 +308,22 @@ body[data-dsh-skin-center] [class*="_button"] {
   }
 }
 
-[data-slot="sidebar.settings"] [role="dialog"] > nav button[aria-current="true"] {
+[data-dsh-surface="settings"] > nav button[aria-current="true"] {
   background: color-mix(in srgb, var(--orca-blue) 18%, transparent);
   color: var(--orca-ink);
 }
 
-[data-slot="sidebar.settings"] [role="dialog"] > nav button + button {
+[data-dsh-surface="settings"] > nav button + button {
   border-top: 2px solid color-mix(in srgb, var(--orca-blue) 28%, transparent);
   border-radius: 0;
 }
 
 @media (width <= 1099px), (height <= 680px) {
-  body[data-orca-settings-open] [data-slot="sidebar.settings"] > [role="presentation"] {
+  body[data-orca-settings-open] [data-dsh-surface="settings"]:has(> nav) {
     padding: 0;
   }
 
-  body[data-orca-settings-open] [data-slot="sidebar.settings"] > [role="presentation"] > [role="dialog"] {
+  body[data-orca-settings-open] [data-dsh-surface="settings"]:has(> nav) {
     width: 100vw;
     max-width: none;
     height: 100dvh;
@@ -334,11 +334,11 @@ body[data-dsh-skin-center] [class*="_button"] {
 }
 
 @media (width <= 640px) {
-  body[data-orca-settings-open] [data-slot="sidebar.settings"] > [role="presentation"] > [role="dialog"] {
+  body[data-orca-settings-open] [data-dsh-surface="settings"]:has(> nav) {
     flex-direction: column;
   }
 
-  body[data-orca-settings-open] [data-slot="sidebar.settings"] > [role="presentation"] > [role="dialog"] > nav {
+  body[data-orca-settings-open] [data-dsh-surface="settings"] > nav {
     box-sizing: border-box;
     border-bottom: 1px solid var(--orca-line);
     gap: 8px;
@@ -346,61 +346,74 @@ body[data-dsh-skin-center] [class*="_button"] {
     padding: 10px 12px 8px;
   }
 
-  body[data-orca-settings-open] [data-slot="sidebar.settings"] > [role="presentation"] > [role="dialog"] > nav > :last-child {
+  /* The nav is a title plus a button list (dsh 0.2.0 SettingsRoot). These
+     rules used to address nav's last and first child, which under that
+     structure is the BUTTON LIST and the TITLE -- so the three-column grid
+     meant for the foot cluster was laid over every navigation cell,
+     squeezing the nav into a mis-wrapped column and pushing the whole
+     dialog off its seat. Address the list and the title by their module
+     classes so the grid lands on the intended footer cluster and the nav
+     keeps its own single column. */
+  body[data-orca-settings-open] [data-dsh-surface="settings"] > nav [class*="_navList"] {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 4px;
     display: grid;
   }
 
-  body[data-orca-settings-open] [data-slot="sidebar.settings"] > [role="presentation"] > [role="dialog"] > nav > :first-child {
+  body[data-orca-settings-open] [data-dsh-surface="settings"] > nav [class*="_navTitle"] {
     padding: 0 4px;
   }
 
-  body[data-orca-settings-open] [data-slot="sidebar.settings"] > [role="presentation"] > [role="dialog"] > nav button {
+  body[data-orca-settings-open] [data-dsh-surface="settings"] > nav button {
     min-width: 0;
     height: 36px;
     padding: 7px 8px;
   }
 
-  body[data-orca-settings-open] [data-slot="sidebar.settings"] > [role="presentation"] > [role="dialog"] > nav + div {
+  body[data-orca-settings-open] [data-dsh-surface="settings"] > nav + div {
     min-height: 0;
   }
 
-  body[data-orca-settings-open] [data-slot="sidebar.settings"] > [role="presentation"] > [role="dialog"] > nav + div > :first-child {
+  /* The content column is a header and an options area (dsh 0.2.0). The
+     positional first/last-child pair happened to match under the older
+     tree; naming the two module classes keeps the intent (a compact
+     header band, a padded body) and stops a future child order change from
+     silently re-routing the padding onto the wrong box. */
+  body[data-orca-settings-open] [data-dsh-surface="settings"] > nav + div > [class*="_header"] {
     height: auto;
     min-height: 46px;
     padding: 8px 10px;
   }
 
-  body[data-orca-settings-open] [data-slot="sidebar.settings"] > [role="presentation"] > [role="dialog"] > nav + div > :last-child {
+  body[data-orca-settings-open] [data-dsh-surface="settings"] > nav + div > [class*="_options"] {
     padding: 0 14px 16px;
   }
 }
 
 @media (width <= 420px) {
-  body[data-orca-settings-open] [data-slot="sidebar.settings"] > [role="presentation"] > [role="dialog"] > nav > :last-child {
+  body[data-orca-settings-open] [data-dsh-surface="settings"] > nav [class*="_navList"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (width <= 520px) {
-  [data-slot="sidebar.settings"] > [role="presentation"] > [role="dialog"] > nav + div > :last-child [class$="_row"]:has( > [class$="_rowText"]) {
+  [data-dsh-surface="settings"] > nav + div > [class*="_options"] [class$="_row"]:has( > [class$="_rowText"]) {
     flex-direction: column;
     align-items: stretch;
   }
 
-  [data-slot="sidebar.settings"] > [role="presentation"] > [role="dialog"] > nav + div > :last-child [class$="_rowText"] {
+  [data-dsh-surface="settings"] > nav + div > [class*="_options"] [class$="_rowText"] {
     width: 100%;
     padding-right: 0;
   }
 
-  [data-slot="sidebar.settings"] > [role="presentation"] > [role="dialog"] > nav + div > :last-child [class$="_row"]:has( > [class$="_rowText"]) > :last-child, body[data-orca-settings-open] [data-slot="sidebar.settings"] > [role="presentation"] > [role="dialog"] > nav + div > :last-child [class$="_row"]:has( > [class$="_rowText"]) [class$="_selector"] {
+  [data-dsh-surface="settings"] > nav + div > [class*="_options"] [class$="_row"]:has( > [class$="_rowText"]) > :last-child, body[data-orca-settings-open] [data-dsh-surface="settings"] > nav + div > [class*="_options"] [class$="_row"]:has( > [class$="_rowText"]) [class$="_selector"] {
     box-sizing: border-box;
     width: 100%;
     max-width: none;
   }
 
-  [data-slot="sidebar.settings"] > [role="presentation"] > [role="dialog"] > nav + div > :last-child [class$="_selector"] {
+  [data-dsh-surface="settings"] > nav + div > [class*="_options"] [class$="_selector"] {
     justify-content: space-between;
   }
 }
@@ -440,7 +453,7 @@ body[data-ds-dark-theme] [role="menu"] {
   background: color-mix(in srgb, currentColor 7%, transparent);
 }
 
-[data-slot="sidebar.settings"] [role="dialog"] [class$="_cubeRow"] > button[class*="_themeCube"] {
+[data-dsh-surface="settings"] [class$="_cubeRow"] > button[class*="_themeCube"] {
   flex-direction: row;
   justify-content: center;
   align-items: center;
@@ -451,11 +464,11 @@ body[data-ds-dark-theme] [role="menu"] {
   position: relative;
 }
 
-[data-slot="sidebar.settings"] [role="dialog"] [class$="_cubeRow"] > button[class*="_themeCube"] > svg {
+[data-dsh-surface="settings"] [class$="_cubeRow"] > button[class*="_themeCube"] > svg {
   flex: none;
 }
 
-[data-slot="sidebar.settings"] [role="dialog"] [class$="_cubeRow"] > button[class*="_themeCube"][aria-pressed="true"]:after {
+[data-dsh-surface="settings"] [class$="_cubeRow"] > button[class*="_themeCube"][aria-pressed="true"]:after {
   content: "";
   border: 1px solid var(--orca-blue);
   background: var(--orca-blue);
@@ -468,7 +481,7 @@ body[data-ds-dark-theme] [role="menu"] {
 }
 
 @supports (appearance: base-select) {
-  [data-slot="sidebar.settings"] [role="dialog"] select {
+  [data-dsh-surface="settings"] select {
     appearance: base-select;
     border: 1px solid var(--orca-line);
     background: color-mix(in srgb, var(--orca-surface-strong) 94%, transparent);
@@ -482,7 +495,7 @@ body[data-ds-dark-theme] [role="menu"] {
     overflow: hidden;
   }
 
-  [data-slot="sidebar.settings"] [role="dialog"] select[class$="_selectInput"] {
+  [data-dsh-surface="settings"] select[class$="_selectInput"] {
     box-sizing: border-box;
     text-align: left;
     align-items: center;
@@ -493,12 +506,12 @@ body[data-ds-dark-theme] [role="menu"] {
     display: flex;
   }
 
-  [data-slot="sidebar.settings"] [role="dialog"] select:hover {
+  [data-dsh-surface="settings"] select:hover {
     border-color: color-mix(in srgb, var(--orca-blue) 42%, var(--orca-line));
     box-shadow: inset 3px 0 0 color-mix(in srgb, var(--orca-blue) 58%, transparent);
   }
 
-  [data-slot="sidebar.settings"] [role="dialog"] select::picker-icon {
+  [data-dsh-surface="settings"] select::picker-icon {
     content: "";
     clip-path: polygon(0 0, 100% 0, 50% 100%);
     background: currentColor;
@@ -509,16 +522,16 @@ body[data-ds-dark-theme] [role="menu"] {
     transition: transform .14s;
   }
 
-  [data-slot="sidebar.settings"] [role="dialog"] select[class$="_selectInput"]::picker-icon {
+  [data-dsh-surface="settings"] select[class$="_selectInput"]::picker-icon {
     flex: none;
     margin-left: auto;
   }
 
-  [data-slot="sidebar.settings"] [role="dialog"] select:open::picker-icon {
+  [data-dsh-surface="settings"] select:open::picker-icon {
     transform: rotate(180deg);
   }
 
-  [data-slot="sidebar.settings"] [role="dialog"] select::picker(select) {
+  [data-dsh-surface="settings"] select::picker(select) {
     appearance: base-select;
     border: 1px solid color-mix(in srgb, var(--orca-graphite) 34%, transparent);
     background: linear-gradient(90deg, color-mix(in srgb, var(--orca-blue) 7%, transparent), transparent 42%), color-mix(in srgb, var(--orca-surface-strong) 98%, transparent);
@@ -530,7 +543,7 @@ body[data-ds-dark-theme] [role="menu"] {
     box-shadow: 8px 10px #1b273a14, 0 18px 42px #1b273a29;
   }
 
-  [data-slot="sidebar.settings"] [role="dialog"] select option {
+  [data-dsh-surface="settings"] select option {
     min-height: 30px;
     color: var(--orca-graphite);
     letter-spacing: .01em;
@@ -544,20 +557,20 @@ body[data-ds-dark-theme] [role="menu"] {
     overflow: hidden;
   }
 
-  [data-slot="sidebar.settings"] [role="dialog"] select option:hover, [data-slot="sidebar.settings"] [role="dialog"] select option:focus-visible {
+  [data-dsh-surface="settings"] select option:hover, [data-dsh-surface="settings"] select option:focus-visible {
     border-left-color: color-mix(in srgb, var(--orca-blue) 48%, transparent);
     background: color-mix(in srgb, var(--orca-blue) 7%, transparent);
     color: var(--orca-ink);
   }
 
-  [data-slot="sidebar.settings"] [role="dialog"] select option:checked {
+  [data-dsh-surface="settings"] select option:checked {
     border-left-color: var(--orca-blue);
     background: linear-gradient(90deg, color-mix(in srgb, var(--orca-blue) 16%, transparent), transparent 74%);
     color: var(--orca-blue);
     font-weight: 700;
   }
 
-  [data-slot="sidebar.settings"] [role="dialog"] select option::checkmark {
+  [data-dsh-surface="settings"] select option::checkmark {
     content: "";
     clip-path: polygon(0 0, 100% 0, 100% 100%, 58% 100%, 58% 42%, 0 42%);
     background: currentColor;
@@ -2151,7 +2164,7 @@ body[data-orca-scene="hero"] .orca-ch-standby {
     transition: none;
   }
 
-  [data-orca-logo-row]:after, .orca-ch-signalDot, [data-orca-link-icon="spinner"] [data-orca-link-spinner-seq], [data-orca-link-icon="todo-progress"] [data-orca-link-todo-progress-cell], body[data-orca-settings-open] [data-slot="sidebar.settings"] > [role="presentation"] > :first-child, body[data-orca-settings-open] [data-slot="sidebar.settings"] > [role="presentation"] > [role="dialog"], body[data-orca-settings-open] [data-slot="sidebar.settings"] > [role="presentation"] > [role="dialog"]:before, body[data-orca-settings-open] [data-slot="sidebar.settings"] > [role="presentation"] > [role="dialog"]:after, [data-phase="hero"] [class*="headlineText"]:after, [data-composer-seat][data-orca-composer-entering], [data-orca-composer-ghost], [data-composer-seat][data-orca-composer-restoring], [data-orca-composer-restore] {
+  [data-orca-logo-row]:after, .orca-ch-signalDot, [data-orca-link-icon="spinner"] [data-orca-link-spinner-seq], [data-orca-link-icon="todo-progress"] [data-orca-link-todo-progress-cell], body[data-orca-settings-open] [data-dsh-surface="settings"]:before, body[data-orca-settings-open] [data-dsh-surface="settings"], body[data-orca-settings-open] [data-dsh-surface="settings"]:before, body[data-orca-settings-open] [data-dsh-surface="settings"]:after, [data-phase="hero"] [class*="headlineText"]:after, [data-composer-seat][data-orca-composer-entering], [data-orca-composer-ghost], [data-composer-seat][data-orca-composer-restoring], [data-orca-composer-restore] {
     animation: none;
   }
 
@@ -2167,7 +2180,7 @@ body[data-orca-scene="hero"] .orca-ch-standby {
     transition: none;
   }
 
-  body[data-orca-settings-open] [data-slot="sidebar.settings"] > [role="presentation"] > [role="dialog"]:before, body[data-orca-settings-open] [data-slot="sidebar.settings"] > [role="presentation"] > [role="dialog"]:after {
+  body[data-orca-settings-open] [data-dsh-surface="settings"]:before, body[data-orca-settings-open] [data-dsh-surface="settings"]:after {
     display: none;
   }
 
@@ -2197,11 +2210,11 @@ body[data-ds-dark-theme][data-orca-lamp="flicker"] [data-dsh-surface="sidebar"] 
   animation: 1s cubic-bezier(.4, 0, .2, 1) both orca-ch-orcaLampFlicker;
 }
 
-[data-slot="sidebar.settings"] [class$="_cardId"] {
+[data-dsh-surface="settings"] [class$="_cardId"] {
   color: var(--orca-graphite);
 }
 
-body[data-ds-dark-theme] [data-slot="sidebar.settings"] [class$="_cardId"] {
+body[data-ds-dark-theme] [data-dsh-surface="settings"] [class$="_cardId"] {
   color: var(--orca-muted);
 }
 

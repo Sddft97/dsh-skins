@@ -3,11 +3,20 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 /**
- * The settings dialog is the one place a skin's square-corner grammar was
- * applied by a blanket descendant reset, which also flattened every panel the
- * dialog hosts. The skin-center card is the case that shipped visibly broken:
- * its status badge (a 999px pill) read as a clipped block and its action
- * buttons lost the rounded shape separating them from the card surface.
+ * The settings dialog and the panels it hosts.
+ *
+ * Two separate defects, both invisible to a stylesheet that parses cleanly:
+ *
+ * 1. The skin squares the settings dialog through a blanket descendant
+ *    reset, which also flattened every panel the dialog hosts -- the
+ *    skin-center status badge (a 999px pill) read as a clipped block and its
+ *    action buttons lost the rounded shape separating them from the card.
+ *
+ * 2. The dialog used to be reached through [data-slot="sidebar.settings"], but
+ *    dsh 0.2.0 ports it to <body> (SettingsPanel uses createPortal), so every
+ *    rule climbing that path matched nothing and the whole settings
+ *    customization was dead. The skin center marks the real dialog with
+    [data-dsh-surface="settings"], which is the anchor the skin now uses.
  *
  * There is no browser layout here (jsdom boxes every element at 0x0), so the
  * defense is asserted on the declarations the browser applies, read from the
@@ -74,7 +83,7 @@ const PANEL_GEOMETRY: Array<[string, string]> = [
 ]
 
 describe('orca-link settings dialog keeps hosted panel geometry', () => {
-  it('restores the radius each skin-center surface declares', () => {
+  it('user sees each hosted skin-center surface keep its own radius', () => {
     // Given the skin-center panel hosted inside the squared settings dialog
     const rules = patchesRules()
     // When each surface carrying its own radius is looked up
@@ -92,15 +101,50 @@ describe('orca-link settings dialog keeps hosted panel geometry', () => {
     }
   })
 
-  it('keeps the dialog chrome itself square', () => {
-    // Given the dialog the skin squares off
+  it('user still sees the dialog chrome itself square', () => {
+    // Given the settings dialog the skin squares off, now reached through the
+    // semantic surface marker (the dialog is portalled to <body>, so the old
+    // sidebar.settings path no longer matches anything)
     const rules = patchesRules()
     // When the blanket dialog rule is read
     const chrome = rules.find((entry) =>
-      entry.selector.includes('sidebar.settings')
-      && entry.selector.includes('[role="dialog"] *'))
+      entry.selector.includes('data-dsh-surface')
+      && entry.selector.includes('settings')
+      && entry.declarations['border-radius'] !== undefined)
     // Then it still squares the dialog, so the fix did not abandon the grammar
     expect(chrome, 'expected the dialog chrome reset').toBeDefined()
     expect(chrome!.declarations['border-radius']).toMatch(/^0\b/)
+  })
+
+  // The dialog moved out of the sidebar slot in dsh 0.2.0. A rule that still
+  // climbs through that slot matches nothing, which is how a whole skin's
+  // settings customization goes silently dead: the CSS parses, the suite
+  // passes, and the panel never changes.
+  it('reaches the settings dialog only through the semantic surface marker', () => {
+    // Given every rule the skin ships that addresses the settings dialog
+    const dialogRules = patchesRules().filter((entry) =>
+      entry.selector.includes('settings'))
+    // Then none of them climbs the dead sidebar.settings path
+    const stale = dialogRules
+      .map((entry) => entry.selector)
+      .filter((selector) => selector.includes('sidebar.settings'))
+    expect(stale).toEqual([])
+    // And the dialog is addressed at all, through the marker skin center sets
+    expect(dialogRules.length).toBeGreaterThan(0)
+  })
+
+  // The overlay, the panel and the mask are three separate boxes since the
+  // portal. Rules that collapse them onto one selector fight each other: the
+  // covering sheet's position/inset would land on the floating panel.
+  it('user sees the overlay and the panel kept as separate boxes', () => {
+    // Given the skin's settings rules
+    const rules = patchesRules()
+    // When the ones carrying the open marker are collected
+    const marked = rules
+      .filter((entry) => entry.selector.includes('data-orca-settings-open')
+        && entry.selector.includes('settings'))
+    // Then the overlay is addressed through a selector distinct from the panel
+    const overlay = marked.filter((entry) => entry.selector.includes(':has('))
+    expect(overlay.length, 'expected overlay-scoped rules').toBeGreaterThan(0)
   })
 })

@@ -2599,7 +2599,7 @@ export default function defineSkinHooks() {
       /* ------------------------- settings overlay ----------------------- */
 
       const settingsOverlayDisposer = (() => {
-        const SETTINGS_DIALOG_SELECTOR = "[data-slot='sidebar.settings'] [role='dialog']"
+        const SETTINGS_DIALOG_SELECTOR = "[data-dsh-surface='settings']" 
         const SETTINGS_OPEN_ATTRIBUTE = 'data-orca-settings-open'
         const CORDIS_PANEL_SELECTOR = "[data-slot='sidebar.footer.action'] [data-cordis-panel]"
         const CORDIS_OPEN_ATTRIBUTE = 'data-orca-cordis-panel-open'
