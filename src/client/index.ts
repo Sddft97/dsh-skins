@@ -40,7 +40,7 @@ import { PreviewCoordinator } from './preview-coordinator.ts'
 import { CustomThemeController } from './custom-theme-controller.ts'
 import { SKIN_CUSTOM_THEME_NS, type CustomThemeConfig } from '../core/custom-theme.ts'
 import { settingsSection } from './settings-section.ts'
-import { boundEntryId } from './settings-entry-id.ts'
+import { boundConfigForm } from './settings-entry-id.ts'
 import { reportDailyHeartbeat } from './telemetry.ts'
 
 export type { SkinCenterComponentProps, SkinCenterInjected } from './SkinCenter.tsx'
@@ -96,15 +96,10 @@ interface SkinCenterSettings {
  * the namespace this package has always owned, and the bridge resolves it to
  * whichever entry id the profile gave this row. A deployment without the
  * group serves no such mapping, so the shared forms service is asked which row
- * it actually serves. Guessing ANOTHER package's entry id is what produced
- * dsh-skins#17: a standalone install (`ui-skin-center`) bound the aggregate's row
- * (`web-ui-skin-center`) whenever the describe mirror had not landed yet, and
- * every `settings.mutate` then addressed an entry the Host does not serve, so
- * applying and restoring a skin both failed with a rejected write and a
- * rolled-back switch. The mirror is the only authority on the entry id, so the
- * one guess that survives an unreadable mirror is this package's OWN row: an
- * entry that is not served reports itself unavailable, which each feature
- * already handles by keeping its defaults and reporting a failed save.
+ * it actually serves via deferred binding: rather than freezing a guess while the
+ * describe mirror is unanswered (#1769), `boundConfigForm` degrades to
+ * 'unavailable' and binds whichever row the Host serves (`web-ui-skin-center`
+ * under an aggregate install, or `ui-skin-center` under a standalone install).
  * @param ctx - client root context.
  * @returns the entry form carrying every preference family.
  */
@@ -113,7 +108,7 @@ function bindConfigForm(ctx: ClientContext): ConfigForm<SkinCenterSettings> {
   if (binder !== undefined && typeof binder.bind === 'function') {
     return binder.bind<SkinCenterSettings>({ namespace: SKIN_BACKGROUND_NS })
   }
-  return ctx.configForms.get<SkinCenterSettings>(boundEntryId(ctx.configForms))
+  return boundConfigForm<SkinCenterSettings>(ctx.configForms)
 }
 
 /**

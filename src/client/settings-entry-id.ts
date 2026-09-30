@@ -4,20 +4,23 @@
  * 0.1.7 addresses configuration as one form per profile entry id, and this
  * package can be installed under two different rows: the family aggregate's
  * generated `web-ui-skin-center` row, or its own standalone bundle row
- * `ui-skin-center` (cordis.patch.yml, and the `name` this plugin exports).
+ * `ui-skin-center` (cordis.patch.yml, and the `name` the plugin exports).
  * `ctx.configForms` carries no package identity, so the only authority on which
  * row is live is the served-namespace list in the shared describe mirror.
  *
- * dsh-skins#17 is the regression this module exists to prevent: the standalone
- * install used to fall back to the AGGREGATE row whenever the mirror had not
- * landed yet, so every `settings.mutate` addressed an entry the Host does not
- * serve. The Host refused the write, the custom-theme card reported a failed
- * save, and the skin switch rolled back and reported a failed apply — on a
- * profile whose skin directory and active API were both healthy.
+ * Issue #1769 / dsh-skins#17:
+ * Under an aggregate install (@linxin666/dsh-web-all), freezing an entry id
+ * before the describe mirror answers resulted in binding to 'ui-skin-center',
+ * which does not exist in an aggregate profile. The Host answers
+ * 'No configurable plugin entry "ui-skin-center"' and settings mutations fail.
+ *
+ * Deferred binding avoids guessing a row while the mirror is unready: the form
+ * reports 'unavailable' and prevents writes until the mirror answers, and then
+ * binds the row the Host actually serves.
  *
  * @module @linxin666/dsh-client-ui-skin-center/settings-entry-id
  */
-import type { ConfigForms } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm, ConfigFormSnapshot, ConfigForms } from '@deepseek-ai/dsh-client-ui-settings/client'
 
 /** Profile entry id the family aggregate's generated row carries. */
 const AGGREGATE_ENTRY_ID = 'web-ui-skin-center'
@@ -25,9 +28,7 @@ const AGGREGATE_ENTRY_ID = 'web-ui-skin-center'
 /**
  * This package's own declared plugin name, which is also the entry id its
  * standalone bundle patch row carries (cordis.patch.yml) and the `name` the
- * plugin exports (src/index.ts). It is the one safe guess when the describe
- * mirror cannot answer, because it names the row this package itself installs
- * rather than a row that belongs to a different package.
+ * plugin exports (src/index.ts).
  */
 const OWN_ENTRY_ID = 'ui-skin-center'
 
@@ -61,12 +62,138 @@ export function servedEntryId(forms: ConfigForms, candidates: readonly string[] 
 
 /**
  * The entry id to bind, which is this package's OWN row whenever the mirror
- * cannot name a skin-center row. Addressing another package's row is the #17
- * failure; addressing this one's own row is safe because an entry that is not
- * served reports itself `unavailable` instead of silently accepting a write.
+ * cannot name a skin-center row.
+ *
+ * @deprecated Prefer {@link boundConfigForm} which performs deferred binding
+ * and avoids guessing rows that do not exist under aggregate installs.
  * @param forms - the shared configuration forms service.
  * @returns the entry id whose form the plugin should address.
  */
 export function boundEntryId(forms: ConfigForms): string {
   return servedEntryId(forms) ?? OWN_ENTRY_ID
+}
+
+/**
+ * Snapshot for a form whose entry is unserved or whose describe mirror has
+ * not yet answered.
+ */
+function unavailableSnapshot<T>(): ConfigFormSnapshot<T> {
+  return {
+    status: 'unavailable',
+    value: undefined,
+    base: undefined,
+    user: undefined,
+    revision: undefined,
+    writable: false,
+    mode: 'host',
+  }
+}
+
+/**
+ * A deferred ConfigForm that binds the row actually served once the describe
+ * mirror answers, and degrades to 'unavailable' without issuing silent writes to
+ * guessed entry ids while the mirror is unready or absent.
+ *
+ * @param forms - the shared configuration forms service.
+ * @param candidates - candidate entry ids in preference order.
+ * @returns a ConfigForm delegating to the resolved entry's form.
+ */
+export function boundConfigForm<T>(
+  forms: ConfigForms,
+  candidates: readonly string[] = SKIN_CENTER_ENTRY_IDS,
+): ConfigForm<T> {
+  const listeners = new Set<() => void>()
+  let bound: ConfigForm<T> | undefined
+  let boundId: string | undefined
+  let offBound: (() => void) | undefined
+  let subscribedToMirror = false
+
+  const resolve = (): string | null => {
+    return servedEntryId(forms, candidates)
+  }
+
+  const publish = (): void => {
+    for (const listener of [...listeners]) {
+      listener()
+    }
+  }
+
+  const bind = (): void => {
+    ensureMirrorSubscription()
+    const target = resolve()
+    if (target === boundId) return
+    offBound?.()
+    offBound = undefined
+    if (target === null) {
+      boundId = undefined
+      bound = undefined
+      publish()
+      return
+    }
+    let form: ConfigForm<T>
+    try {
+      form = forms.get<T>(target)
+    } catch {
+      boundId = undefined
+      bound = undefined
+      publish()
+      return
+    }
+    boundId = target
+    bound = form
+    offBound = form.subscribe(() => { publish() })
+    publish()
+  }
+
+  const ensureMirrorSubscription = (): void => {
+    if (subscribedToMirror) return
+    try {
+      const describeFace = forms.describe()
+      if (typeof describeFace?.subscribe === 'function') {
+        describeFace.subscribe(() => { bind() })
+        subscribedToMirror = true
+      }
+      if (typeof describeFace?.ensure === 'function') {
+        void describeFace.ensure()
+      }
+    } catch {
+      // Mirror not ready or does not support subscribe
+    }
+  }
+
+  bind()
+
+  return {
+    getSnapshot: () => {
+      if (bound === undefined) {
+        bind()
+      }
+      return bound?.getSnapshot() ?? unavailableSnapshot<T>()
+    },
+    subscribe: (listener) => {
+      ensureMirrorSubscription()
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+      }
+    },
+    set: (field, value) => {
+      if (bound === undefined) {
+        bind()
+      }
+      return bound?.set(field, value) ?? Promise.resolve(false)
+    },
+    unset: (field) => {
+      if (bound === undefined) {
+        bind()
+      }
+      return bound?.unset(field) ?? Promise.resolve(false)
+    },
+    mutate: (ops, expectedRevision) => {
+      if (bound === undefined) {
+        bind()
+      }
+      return bound?.mutate(ops, expectedRevision) ?? Promise.resolve(false)
+    },
+  }
 }

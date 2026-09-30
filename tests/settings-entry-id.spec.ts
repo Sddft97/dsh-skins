@@ -8,20 +8,24 @@
  * shared forms service carries no package identity, so the only authority on
  * which row is live is the served-namespace list in the describe mirror.
  *
- * dsh-skins#17 is the regression these tests guard: the standalone install
- * bound the AGGREGATE row whenever the mirror had not landed yet, so every
- * `settings.mutate` addressed an entry the Host does not serve. The Host refused
- * the write, the custom-theme card reported a failed save, and the skin switch
- * rolled back and reported a failed apply — on a profile whose skin directory
- * and active API were both healthy.
+ * Issue #1769 / dsh-skins#17:
+ * Under an aggregate install (@linxin666/dsh-web-all), freezing an entry id
+ * before the describe mirror answers resulted in binding to 'ui-skin-center',
+ * an entry that does not exist in an aggregate profile. The Host answers
+ * 'No configurable plugin entry "ui-skin-center"' and settings mutations fail.
  *
- * The tests call the shipped resolver directly, so a reintroduced guess fails
- * here rather than on a user's Windows profile.
+ * Deferred binding avoids freezing a guess: until the describe mirror answers,
+ * the form degrades to 'unavailable' without issuing silent writes to guessed rows.
+ * Once the mirror answers, it binds the row the Host actually serves.
  */
 import type { ConfigForm, ConfigForms } from '@deepseek-ai/dsh-client-ui-settings/client'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import { boundEntryId, servedEntryId } from '../src/client/settings-entry-id.ts'
+import * as settingsEntryIdModule from '../src/client/settings-entry-id.ts'
+import { servedEntryId } from '../src/client/settings-entry-id.ts'
+
+const bindConfigForm = (settingsEntryIdModule as { boundConfigForm?: typeof import('../src/client/settings-entry-id.ts').boundConfigForm }).boundConfigForm
+  ?? ((forms: ConfigForms) => forms.get((settingsEntryIdModule as unknown as { boundEntryId: (f: ConfigForms) => string }).boundEntryId(forms)))
 
 /** Entry id the aggregate's generated row carries. */
 const AGGREGATE_ENTRY_ID = 'web-ui-skin-center'
@@ -30,71 +34,158 @@ const AGGREGATE_ENTRY_ID = 'web-ui-skin-center'
 const OWN_ENTRY_ID = 'ui-skin-center'
 
 /**
- * A `configForms` stub that records which entry id was asked for, and answers
- * `describe()` from the namespace list a Host would serve. `served: null`
- * models the pre-boot window in which the mirror cannot be read at all.
+ * A `configForms` stub that records which entry id was asked for, records mutations,
+ * and answers `describe()` from the namespace list a Host would serve. `served: null`
+ * models the pre-boot window in which the mirror has no view yet.
  */
-function fakeForms(served: readonly string[] | null): { forms: ConfigForms; requested: string[] } {
+function fakeForms(initialServed: readonly string[] | null) {
   const requested: string[] = []
-  const form = (): ConfigForm<unknown> => ({
-    getSnapshot: () => ({ status: 'ready', value: {}, base: undefined, user: undefined, revision: 1, writable: true, mode: 'host' }),
-    subscribe: () => () => {},
-    set: async () => true,
-    unset: async () => true,
-    mutate: async () => true,
-  })
-  const forms = {
-    describe: () => {
-      if (served === null) throw new Error('the describe mirror is not ready')
-      return { getSnapshot: () => ({ view: { namespaces: served.map(ns => ({ ns })) } }) }
+  const mutations: Array<{ entryId: string; ops: unknown }> = []
+  let served = initialServed
+  const describeListeners = new Set<() => void>()
+  const formListeners = new Map<string, Set<() => void>>()
+
+  const form = (entryId: string): ConfigForm<unknown> => ({
+    getSnapshot: () => ({
+      status: 'ready' as const,
+      value: { entryId },
+      base: undefined,
+      user: undefined,
+      revision: 1,
+      writable: true,
+      mode: 'host' as const,
+    }),
+    subscribe: (listener: () => void) => {
+      if (!formListeners.has(entryId)) formListeners.set(entryId, new Set())
+      formListeners.get(entryId)!.add(listener)
+      return () => { formListeners.get(entryId)?.delete(listener) }
     },
+    set: async (field: string, value: unknown) => {
+      mutations.push({ entryId, ops: [{ op: 'set', field, value }] })
+      return true
+    },
+    unset: async (field: string) => {
+      mutations.push({ entryId, ops: [{ op: 'unset', field }] })
+      return true
+    },
+    mutate: async (ops: readonly unknown[]) => {
+      mutations.push({ entryId, ops })
+      return true
+    },
+  })
+
+  const forms = {
+    describe: () => ({
+      getSnapshot: () => ({
+        status: (served === null ? 'loading' : 'ready') as 'loading' | 'ready',
+        view: served === null ? undefined : { namespaces: served.map(ns => ({ ns })) },
+        error: null,
+      }),
+      subscribe: (listener: () => void) => {
+        describeListeners.add(listener)
+        return () => { describeListeners.delete(listener) }
+      },
+      ensure: async () => {},
+    }),
     get: (entryId: string) => {
       requested.push(entryId)
-      return form()
+      return form(entryId)
     },
   } as unknown as ConfigForms
-  return { forms, requested }
+
+  const answerMirror = (nextServed: readonly string[]) => {
+    served = nextServed
+    for (const listener of [...describeListeners]) listener()
+  }
+
+  return { forms, requested, mutations, answerMirror }
 }
 
 describe('the skin center binds the entry row the Host actually serves', () => {
-  it('binds the standalone row when that is the row in the profile', () => {
-    // Given a standalone install, where the profile carries only this
-    // package's own row
-    const { forms, requested } = fakeForms([OWN_ENTRY_ID])
+  it('binds the standalone row when that is the row in the profile', async () => {
+    // Given a standalone install, where the profile carries only this package's own row
+    const { forms, requested, mutations } = fakeForms([OWN_ENTRY_ID])
 
-    // When the entry id is resolved and the form is fetched
-    const bound = boundEntryId(forms)
-    forms.get(bound)
+    // When the form is bound and used
+    const form = bindConfigForm(forms)
 
-    // Then the standalone row is the one addressed, never the aggregate's
-    expect(bound).toBe(OWN_ENTRY_ID)
+    // Then the standalone row is addressed
     expect(requested).toEqual([OWN_ENTRY_ID])
+    expect(form.getSnapshot().status).toBe('ready')
+    const accepted = await form.mutate([{ op: 'set', path: ['skin-wallpaper', 'selection'], value: '123' }])
+    expect(accepted).toBe(true)
+    expect(mutations).toEqual([
+      { entryId: OWN_ENTRY_ID, ops: [{ op: 'set', path: ['skin-wallpaper', 'selection'], value: '123' }] },
+    ])
   })
 
-  it('binds the aggregate row when the family aggregate serves it', () => {
+  it('binds the aggregate row when the family aggregate serves it', async () => {
     // Given the family aggregate install, whose generated row is served
-    const { forms } = fakeForms([AGGREGATE_ENTRY_ID])
+    const { forms, requested, mutations } = fakeForms([AGGREGATE_ENTRY_ID])
 
-    // When the entry id is resolved
-    const bound = boundEntryId(forms)
+    // When the form is bound and used
+    const form = bindConfigForm(forms)
 
-    // Then the aggregate row is the one addressed
-    expect(bound).toBe(AGGREGATE_ENTRY_ID)
+    // Then the aggregate row is addressed
+    expect(requested).toEqual([AGGREGATE_ENTRY_ID])
+    expect(form.getSnapshot().status).toBe('ready')
+    const accepted = await form.mutate([{ op: 'set', path: ['skin-wallpaper', 'selection'], value: '123' }])
+    expect(accepted).toBe(true)
+    expect(mutations).toEqual([
+      { entryId: AGGREGATE_ENTRY_ID, ops: [{ op: 'set', path: ['skin-wallpaper', 'selection'], value: '123' }] },
+    ])
   })
 
-  it('does not bind the aggregate row when the mirror cannot answer', () => {
-    // Given a describe mirror that is not readable yet — the exact window the
-    // #17 report was filed in
-    const { forms, requested } = fakeForms(null)
+  it('degrades to unavailable and does not write to a guessed row when mirror is unanswered', async () => {
+    // Given a describe mirror that is not readable yet (unanswered mirror)
+    const { forms, requested, mutations } = fakeForms(null)
 
-    // When the entry id is resolved before the mirror has landed
-    const bound = boundEntryId(forms)
-    forms.get(bound)
+    // When the form is bound before the mirror has landed
+    const form = bindConfigForm(forms)
 
-    // Then it binds this package's OWN row. Guessing the aggregate's row here
-    // is what made every write address an entry the Host does not serve.
-    expect(bound).toBe(OWN_ENTRY_ID)
-    expect(requested).toEqual([OWN_ENTRY_ID])
+    // Then it must NOT guess any row or address unserved rows
+    expect(requested).toEqual([])
+    expect(form.getSnapshot().status).toBe('unavailable')
+
+    // And mutations fail closed rather than writing to a guessed entry id
+    const accepted = await form.mutate([{ op: 'set', path: ['skin-wallpaper', 'selection'], value: '123' }])
+    expect(accepted).toBe(false)
+    expect(mutations).toEqual([])
+  })
+
+  it('promotes to the aggregate row once the mirror answers (#1769)', async () => {
+    // Given a deployment where mirror is unanswered at initial bind time
+    const { forms, requested, mutations, answerMirror } = fakeForms(null)
+    const form = bindConfigForm(forms)
+    expect(requested).toEqual([])
+    expect(form.getSnapshot().status).toBe('unavailable')
+
+    // When the mirror answers with the aggregate row
+    answerMirror([AGGREGATE_ENTRY_ID])
+
+    // Then the form binds the aggregate row and mutation succeeds on it
+    expect(requested).toEqual([AGGREGATE_ENTRY_ID])
+    expect(form.getSnapshot().status).toBe('ready')
+    const accepted = await form.mutate([{ op: 'set', path: ['skin-wallpaper', 'selection'], value: '456' }])
+    expect(accepted).toBe(true)
+    expect(mutations).toEqual([
+      { entryId: AGGREGATE_ENTRY_ID, ops: [{ op: 'set', path: ['skin-wallpaper', 'selection'], value: '456' }] },
+    ])
+  })
+
+  it('notifies subscribers when the mirror answers and promotes the form', () => {
+    // Given an unanswered mirror
+    const { forms, answerMirror } = fakeForms(null)
+    const form = bindConfigForm(forms)
+    const listener = vi.fn()
+    form.subscribe(listener)
+    expect(listener).not.toHaveBeenCalled()
+
+    // When the mirror answers
+    answerMirror([AGGREGATE_ENTRY_ID])
+
+    // Then subscribers are notified of the promotion
+    expect(listener).toHaveBeenCalled()
   })
 
   it('reports an unknown entry id when the mirror cannot answer', () => {
@@ -104,37 +195,56 @@ describe('the skin center binds the entry row the Host actually serves', () => {
     // When the served row is asked for directly
     const served = servedEntryId(forms)
 
-    // Then it is reported as unknown rather than guessed, so a caller can tell
-    // "not served yet" from "served as this id"
+    // Then it is reported as unknown rather than guessed
     expect(served).toBeNull()
   })
 
-  it('prefers the standalone row when a profile serves both', () => {
-    // Given a profile that serves both rows, the package's own row is the one
-    // this plugin's own patch file installed
-    const { forms } = fakeForms([AGGREGATE_ENTRY_ID, OWN_ENTRY_ID])
+  it('handles a mirror whose describe throws without unhandled crash', () => {
+    // Given a mirror that throws on describe
+    const throwingForms = {
+      describe: () => { throw new Error('mirror unavailable') },
+      get: (id: string) => ({
+        getSnapshot: () => ({ status: 'ready', value: { id }, base: undefined, user: undefined, revision: 1, writable: true, mode: 'host' }),
+        subscribe: () => () => {},
+        set: async () => true,
+        unset: async () => true,
+        mutate: async () => true,
+      }),
+    } as unknown as ConfigForms
 
-    expect(boundEntryId(forms)).toBe(OWN_ENTRY_ID)
+    const form = bindConfigForm(throwingForms)
+    expect(form.getSnapshot().status).toBe('unavailable')
+    expect(servedEntryId(throwingForms)).toBeNull()
   })
 
-  it('falls back to its own row when a profile serves neither', () => {
-    // Given a deployment that serves no skin-center row at all: the form must
-    // still be addressable by this package's own id and report unavailable,
-    // rather than addressing a foreign entry
-    const { forms, requested } = fakeForms(['some-other-plugin'])
+  it('prefers the standalone row when a profile serves both', () => {
+    // Given a profile that serves both rows
+    const { forms, requested } = fakeForms([AGGREGATE_ENTRY_ID, OWN_ENTRY_ID])
 
-    const bound = boundEntryId(forms)
-    forms.get(bound)
+    bindConfigForm(forms)
 
-    expect(bound).toBe(OWN_ENTRY_ID)
     expect(requested).toEqual([OWN_ENTRY_ID])
+  })
+
+  it('degrades to unavailable when a profile serves neither row', async () => {
+    // Given a deployment that serves no skin-center row at all
+    const { forms, requested, mutations } = fakeForms(['some-other-plugin'])
+
+    const form = bindConfigForm(forms)
+
+    expect(requested).toEqual([])
+    expect(form.getSnapshot().status).toBe('unavailable')
+    const accepted = await form.mutate([{ op: 'set', path: ['skin-wallpaper', 'selection'], value: '123' }])
+    expect(accepted).toBe(false)
+    expect(mutations).toEqual([])
   })
 
   it('still resolves the legacy background namespace when only that is served', () => {
     // Given a profile that named the row after the legacy background namespace
-    const { forms } = fakeForms(['skin-background'])
+    const { forms, requested } = fakeForms(['skin-background'])
 
-    // Then that row is still honoured
-    expect(boundEntryId(forms)).toBe('skin-background')
+    bindConfigForm(forms)
+
+    expect(requested).toEqual(['skin-background'])
   })
 })
