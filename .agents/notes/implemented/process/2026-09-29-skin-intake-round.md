@@ -78,7 +78,9 @@ reached with the pane declared as an established layout fact.
 - `skins/porco-rosso`, `skins/last-exile` and `skins/white-snake` are listed;
   the catalog moves 47 -> 50 with nothing removed, and the dsh-web pin and
   `market/dist` follow in a separate landing commit.
-- #16 and #18 stay open with their blocking items named in the pull request, so
-  the contributor has a single place to act on.
+- #16 and #18 stayed open with their blocking items named in the pull request;
+  the 2026-09-30 round verified both replies, merged both, and took #16 at
+  32,494,969 bytes rather than the bake this note asked for (see the 2026-09-30
+  note for that departure).
 - The review record for #18 is now also a note about the details pane: the next
   round should read `[data-pane]` geometry before calling an edge a seam.
