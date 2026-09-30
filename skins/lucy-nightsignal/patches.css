@@ -26,11 +26,15 @@
 [id="root"] {
   background: none;
   position: relative;
+padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
+margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 body {
   isolation: isolate;
   --lucy-wing-gap: clamp(6px, 1vw, 22px);
+padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
+margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 /* The Windows desktop host paints `--dsw-specific-sidebar-fill` on the
@@ -38,6 +42,8 @@ body {
    and would crush the background illustration. */
 [class*="_frame"] {
   background: transparent !important;
+padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
+margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 /* 2 ---------------------------------------------------------------------- */
@@ -58,6 +64,8 @@ body {
 ) {
   --dsh-chat-user-width: min(clamp(420px, 38vw, 700px), calc(100% - 24px)) !important;
   --dsh-chat-content-width: min(clamp(420px, 38vw, 700px), calc(100% - 24px)) !important;
+padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
+margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 /* 3 ---------------------------------------------------------------------- */
@@ -87,6 +95,8 @@ body {
 [data-composer-seat],
 [data-dsh-surface="composer"] {
   anchor-name: --lucy-composer;
+padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
+margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 body:before,
@@ -106,6 +116,8 @@ body:after {
   opacity: 1;
   filter: saturate(1.06) contrast(1.04) drop-shadow(0 22px 30px #04101f5c);
   transition: left 0.3s cubic-bezier(0.22, 0.78, 0.2, 1), right 0.3s cubic-bezier(0.22, 0.78, 0.2, 1), height 0.6s cubic-bezier(0.22, 0.78, 0.2, 1);
+padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
+margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 /* Left portrait: back view, right edge on the card's left edge. */
@@ -119,6 +131,8 @@ body:before {
   background-image:
     radial-gradient(58% 46% at 55% 72%, #dfeaf459, #dfeaf400 72%),
     url("assets/lucy-signal-left.webp");
+padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
+margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 /* Right portrait: front view, left edge on the card's right edge. Its height is
@@ -132,6 +146,8 @@ body:after {
   background-image:
     radial-gradient(58% 46% at 45% 72%, #dfeaf459, #dfeaf400 72%),
     url("assets/lucy-signal-right.webp");
+padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
+margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 /* No pane-aware hiding: an earlier revision hid the right portrait whenever the
@@ -144,12 +160,16 @@ body[data-ds-dark-theme]:before {
   background-image:
     radial-gradient(58% 46% at 55% 72%, #0a1526a6, #0a152600 72%),
     url("assets/lucy-signal-left.webp");
+padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
+margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 body[data-ds-dark-theme]:after {
   background-image:
     radial-gradient(58% 46% at 45% 72%, #0a1526a6, #0a152600 72%),
     url("assets/lucy-signal-right.webp");
+padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
+margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 @media (width <= 900px) {
@@ -157,6 +177,8 @@ body[data-ds-dark-theme]:after {
   body:after {
     display: none;
   }
+padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
+margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 /* 4 ---------------------------------------------------------------------- */
@@ -172,6 +194,8 @@ body[data-ds-dark-theme]:after {
   height: 2px;
   pointer-events: none;
   background: linear-gradient(90deg, #22d3ee00 0%, #22d3ee8c 22%, #e879f98c 68%, #22d3ee00 100%);
+padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
+margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 /* Sidebar: cyan edge + a faint inner glow so the glass reads as glass. */
@@ -179,35 +203,53 @@ body[data-ds-dark-theme]:after {
 [class*="sidebarCol"] {
   border-right: 1px solid #22d3ee3d;
   box-shadow: inset -18px 0 32px -28px #22d3ee8c;
+padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
+margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 [data-ds-dark-theme] [data-dsh-surface="sidebar"],
 [data-ds-dark-theme] [class*="sidebarCol"] {
   border-right-color: #22d3ee47;
   box-shadow: inset -18px 0 36px -26px #22d3eea6;
+padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
+margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 /* Session header: a whisper of magenta under the title row. */
 :is([data-slot="conversation.session.header"], [data-dsh-surface="session-header"]) {
   border-bottom: 1px solid transparent;
   border-image: linear-gradient(90deg, #22d3ee40, #e879f959, #22d3ee00) 1;
+padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
+margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 /* Composer: neon focus ring on the input card. */
 :is([data-composer-seat], [data-composer-card], [data-dsh-surface="composer"]) {
   border-radius: 18px;
   box-shadow: 0 0 0 1px #22d3ee3d, 0 14px 34px #04101f26;
+padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
+margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 [data-ds-dark-theme] :is([data-composer-seat], [data-composer-card], [data-dsh-surface="composer"]) {
   box-shadow: 0 0 0 1px #22d3ee4d, 0 16px 40px #00000073;
+padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
+margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 :is([data-composer-seat], [data-composer-card], [data-dsh-surface="composer"]):focus-within {
   box-shadow: 0 0 0 1px #22d3ee8c, 0 0 22px -4px #22d3ee59, 0 16px 40px #04101f33;
+padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
+margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 /* Scrollbars pick up the accent instead of the neutral grey. */
 :is([data-conversation-scroll], [data-dsh-part="scrollport"]) {
   scrollbar-color: #22d3ee59 transparent;
+padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
+margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
+}
+
+[class*="_frame"]:not([data-rightbar-collapsed]) [data-rightbar-col] [class*="webview"] {
+  margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
