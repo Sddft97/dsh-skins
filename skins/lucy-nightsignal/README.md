@@ -41,6 +41,30 @@ Both are 1440x900 JPEG q85, shot through the market's own facade renderer.
 - No `hooks.mjs`: the market preview renderer never runs skin hooks, so the scene
   is declarative on purpose.
 
+## Provenance and copyright
+
+**The artwork is AI-generated.** Every raster asset under `assets/` was produced with
+an image model through the OFOX image API (`volcengine/doubao-seedream-5.0-pro`) and then processed locally: the
+scenes by a phosphor duotone pass with halation, then baked scanlines, a vignette and grain; the portraits by chroma-key matting (key estimation, alpha ramp, unmix, despill, alpha floor, connected-component despeckle). **No photograph, cosplay
+image, or other third-party picture was given to any model** - the character was
+described in text only.
+
+**Character and source work.** The two portraits depict **Lucy / Lucyna Kushinada**
+from **Cyberpunk: Edgerunners**. The character design, the work itself and its
+setting belong to their rights holders: **Studio TRIGGER** and **CD PROJEKT RED**
+(together with their respective licensors and successors).
+
+**Terms of use.** **Personal, non-commercial use only.** This is **unofficial fan
+artwork**: it is not affiliated with, endorsed by, sponsored by, or licensed from
+Studio TRIGGER, CD PROJEKT RED, the maintainers of this repository, or the DeepSeek
+Harness project. All rights to the character and the source work remain with their
+rights holders; if a rights holder objects, this skin should be removed.
+
+**Licence of the skin itself.** The skin's own code and styles (`skin.json`,
+`skin.css`, `patches.css`, and `hooks.mjs` where present) are released under
+**CC BY-NC-SA 4.0** (see the repository `LICENSE`). That licence covers only the
+parts authored here and grants no rights to the character or the source work.
+
 ## Known limitations
 
 - Presentation only: the skin mutates browser styles and never touches a model
