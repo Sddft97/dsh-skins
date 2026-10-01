@@ -210,31 +210,40 @@ body[data-ds-dark-theme] [role="dialog"] {
   --orca-dialog-bg: #0f151f;
 }
 
-body[data-orca-settings-open] [data-dsh-surface="settings"]:has(> nav) {
+/* The skin-center stamps data-dsh-surface="settings" on the PANEL element
+   itself -- the [role="dialog"] that holds the nav (semantic-adapter.ts:
+   '[role="dialog"]:has([data-slot="settings.section"])') -- not on the
+   overlay that centers it. The rules that used to live here treated that
+   element as the overlay wrapper: they set position:fixed/inset:0/padding on
+   the panel and then sized the same element again, so full-viewport
+   placement and panel sizing landed on one box and the dialog lost its
+   centered frame. The mask rule was dead for the same reason -- the mask is a
+   sibling of the panel inside .overlay, never a child of the dialog.
+   The panel keeps the shell's own centered-overlay layout; the skin only
+   restyles its surface (box, border, shadow, sizing). Overlay-level concerns
+   (centering offsets, the mask) are now written against the overlay. */
+body[data-orca-settings-open] [data-dsh-surface="settings"] {
+  box-sizing: border-box;
   z-index: var(--orca-settings-overlay-z);
   isolation: isolate;
-  box-sizing: border-box;
   pointer-events: auto;
-  padding: 24px;
-  position: fixed;
-  inset: 0;
-}
-
-body[data-orca-settings-open] [data-dsh-surface="settings"]:has(> nav) > [class*="_mask"] {
-  z-index: 0;
-  animation: .17s ease-out both orca-ch-orcaSettingsMaskIn;
-}
-
-body[data-orca-settings-open] [data-dsh-surface="settings"] {
-  z-index: 1;
   border: 1px solid var(--orca-line);
-  width: min(800px, 100vw - 48px);
+  background: var(--orca-dialog-bg);
   max-width: none;
-  height: min(760px, 100vh - 48px);
+  width: min(800px, calc(100vw - 48px));
+  height: min(760px, calc(100vh - 48px));
   box-shadow: var(--orca-shadow);
   transform-origin: 0 100%;
   animation: .2s ease-out both orca-ch-orcaSettingsPanelIn;
   position: relative;
+}
+
+/* The mask is a sibling of the panel inside the shell's overlay, so it is
+   reached from that overlay rather than from the dialog. :has(> [role=dialog])
+   keeps the rule tied to the settings surface instead of every overlay. */
+body[data-orca-settings-open] [class*="_overlay"]:has(> [data-dsh-surface="settings"]) > [class*="_mask"] {
+  z-index: 0;
+  animation: .17s ease-out both orca-ch-orcaSettingsMaskIn;
 }
 
 body[data-orca-cordis-panel-open] :is([data-pane="sidebar"], [data-dsh-surface="sidebar"] > :first-child) {
@@ -275,20 +284,23 @@ body[data-dsh-skin-center] [class*="_button"] {
   border-radius: 6px;
 }
 
+/* The panel is the dialog element; placement (offsetting the dialog clear of the
+   wide sidebar rail) belongs on the overlay that centers it, not on the panel.
+   Sizing belongs on the panel. */
 @media (width >= 1100px) and (height >= 681px) {
-  body[data-orca-settings-open] [data-dsh-surface="settings"]:has(> nav) {
+  body[data-orca-settings-open] [class*="_overlay"]:has(> [data-dsh-surface="settings"]) {
     justify-content: flex-start;
     align-items: flex-end;
     padding: 18px 18px 18px 72px;
   }
 
-  body[data-orca-sidebar-wide] [data-dsh-surface="settings"] {
+  body[data-orca-sidebar-wide] [class*="_overlay"]:has(> [data-dsh-surface="settings"]) {
     padding-left: calc(var(--orca-sidebar-width) + 16px);
   }
 
-  body[data-orca-settings-open] [data-dsh-surface="settings"]:has(> nav) {
-    width: min(760px, 100vw - 108px);
-    height: min(680px, 100vh - 36px);
+  body[data-orca-settings-open] [data-dsh-surface="settings"] {
+    width: min(760px, calc(100vw - 108px));
+    height: min(680px, calc(100vh - 36px));
   }
 
   body[data-orca-sidebar-wide] [data-dsh-surface="settings"] {
@@ -308,22 +320,23 @@ body[data-dsh-skin-center] [class*="_button"] {
   }
 }
 
-[data-dsh-surface="settings"] > nav button[aria-current="true"] {
+/* Nav cells live in nav > div.navList (SettingsRoot.tsx). The selected cell is
+   anchored on the list so the rule cannot drift onto a cell the list does not
+   own, and the skin's square-chrome grammar wins over the shell's rounded
+   .navCell.active fill: the cell carries a left accent rule so the active
+   section is unmistakable against the skin's borderless rows. */
+[data-dsh-surface="settings"] > nav [class*="_navList"] > button[aria-current="true"] {
   background: color-mix(in srgb, var(--orca-blue) 18%, transparent);
   color: var(--orca-ink);
-}
-
-[data-dsh-surface="settings"] > nav button + button {
-  border-top: 2px solid color-mix(in srgb, var(--orca-blue) 28%, transparent);
-  border-radius: 0;
+  box-shadow: inset 2px 0 0 var(--orca-blue);
 }
 
 @media (width <= 1099px), (height <= 680px) {
-  body[data-orca-settings-open] [data-dsh-surface="settings"]:has(> nav) {
+  body[data-orca-settings-open] [class*="_overlay"]:has(> [data-dsh-surface="settings"]) {
     padding: 0;
   }
 
-  body[data-orca-settings-open] [data-dsh-surface="settings"]:has(> nav) {
+  body[data-orca-settings-open] [data-dsh-surface="settings"] {
     width: 100vw;
     max-width: none;
     height: 100dvh;
@@ -334,7 +347,7 @@ body[data-dsh-skin-center] [class*="_button"] {
 }
 
 @media (width <= 640px) {
-  body[data-orca-settings-open] [data-dsh-surface="settings"]:has(> nav) {
+  body[data-orca-settings-open] [data-dsh-surface="settings"] {
     flex-direction: column;
   }
 
@@ -364,7 +377,7 @@ body[data-dsh-skin-center] [class*="_button"] {
     padding: 0 4px;
   }
 
-  body[data-orca-settings-open] [data-dsh-surface="settings"] > nav button {
+  body[data-orca-settings-open] [data-dsh-surface="settings"] > nav [class*="_navList"] > button {
     min-width: 0;
     height: 36px;
     padding: 7px 8px;
@@ -1717,7 +1730,12 @@ body[data-orca-sidebar-wide] .orca-ch-pricingLight:hover .orca-ch-pricingTooltip
   }
 }
 
-[data-phase="hero"] [class*="headlineText"] {
+/* Same migration as HEADLINE_SELECTOR in hooks.mjs: the shell now renders the
+   headline text as the first span inside .titleGroup and dropped .headlineText,
+   so these rules were matching nothing -- the headline rendered in the shell's
+   own 26px/500 face with no skin styling and no terminal caret. Address the
+   text span itself; :not() keeps the caret off the preview badge. */
+[data-phase="hero"] :is([class*="headlineText"], [class*="titleGroup"] > span:first-child) {
   min-width: 8.2em;
   color: var(--orca-ink);
   letter-spacing: .04em;
@@ -1725,10 +1743,11 @@ body[data-orca-sidebar-wide] .orca-ch-pricingLight:hover .orca-ch-pricingTooltip
   white-space: nowrap;
   font-size: 30px;
   font-weight: 700;
+  line-height: 1.2;
   display: inline-block;
 }
 
-[data-phase="hero"] [class*="headlineText"]:after {
+[data-phase="hero"] :is([class*="headlineText"], [class*="titleGroup"] > span:first-child):after {
   content: "";
   background: var(--orca-blue);
   width: 9px;
@@ -2164,7 +2183,7 @@ body[data-orca-scene="hero"] .orca-ch-standby {
     transition: none;
   }
 
-  [data-orca-logo-row]:after, .orca-ch-signalDot, [data-orca-link-icon="spinner"] [data-orca-link-spinner-seq], [data-orca-link-icon="todo-progress"] [data-orca-link-todo-progress-cell], body[data-orca-settings-open] [data-dsh-surface="settings"]:before, body[data-orca-settings-open] [data-dsh-surface="settings"], body[data-orca-settings-open] [data-dsh-surface="settings"]:before, body[data-orca-settings-open] [data-dsh-surface="settings"]:after, [data-phase="hero"] [class*="headlineText"]:after, [data-composer-seat][data-orca-composer-entering], [data-orca-composer-ghost], [data-composer-seat][data-orca-composer-restoring], [data-orca-composer-restore] {
+  [data-orca-logo-row]:after, .orca-ch-signalDot, [data-orca-link-icon="spinner"] [data-orca-link-spinner-seq], [data-orca-link-icon="todo-progress"] [data-orca-link-todo-progress-cell], body[data-orca-settings-open] [data-dsh-surface="settings"]:before, body[data-orca-settings-open] [data-dsh-surface="settings"], body[data-orca-settings-open] [data-dsh-surface="settings"]:before, body[data-orca-settings-open] [data-dsh-surface="settings"]:after, [data-phase="hero"] :is([class*="headlineText"], [class*="titleGroup"] > span:first-child):after, [data-composer-seat][data-orca-composer-entering], [data-orca-composer-ghost], [data-composer-seat][data-orca-composer-restoring], [data-orca-composer-restore] {
     animation: none;
   }
 

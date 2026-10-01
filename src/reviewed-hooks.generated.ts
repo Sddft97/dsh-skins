@@ -82,7 +82,7 @@ export const REVIEWED_SKIN_HOOKS: Readonly<Record<string, ReviewedSkinHooksIdent
   "orca-link": {
     entry: "hooks.mjs",
     manifestSha256: "48b9c76b6f8fc4fad1473d987c0ebd8c10f4734e2eff2091bbb9040c9a5ce089",
-    hooksSha256: "c4b5f43ea0a1d19017836dc39e17ee88ac7c4ddf4cec8bb7544683a6cf6b7497",
+    hooksSha256: "603b0b8aa5ab1d580011bc4ba5d00e82f0d3d76c9a3cd76cbb83043906e3a026",
   },
   "phoebe-atelier": {
     entry: "hooks.mjs",
