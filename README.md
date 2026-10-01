@@ -1,6 +1,19 @@
-# Skin Center (in-GUI skin center)
+# dsh-skins · Skin Center & Wallpaper Engine Dynamic Themes for DeepSeek Harness (DSH)
 
 English | [中文](README.zh.md)
+
+<p align="center">
+  <img src="https://img.shields.io/npm/v/@linxin666/dsh-client-ui-skin-center?style=flat-square" alt="Version">
+  &nbsp;
+  <img src="https://img.shields.io/badge/DSH-%3E%3D0.2.0--rc.2-4c6ef5?style=flat-square&amp;labelColor=454a54" alt="DSH">
+  &nbsp;
+  <img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square" alt="License">
+</p>
+
+<p align="center">
+  <strong>Theme & Personalization Engine for DeepSeek Harness (DSH) Web GUI & Desktop Client</strong><br>
+  <em>Themes & Skins · Wallpaper Engine Dynamic Backdrops · Frosted Glass Blur · Custom Themes · Live Try-On</em>
+</p>
 
 `@linxin666/dsh-client-ui-skin-center` (cordis plugin id `ui-skin-center`) is the single skin package of the dsh Web GUI: it puts the skin list / try-on / apply into the real GUI as the first-level Skin Center settings section (settings → 皮肤中心, listing only installed skins), and it is the only loader and renderer for skins. A skin is a pure asset directory — no package.json, no npm publish, no cordis wiring — that couples only to the skin-center contract (`contracts/`); the skin center absorbs every official-DSH coupling behind that contract. The card carries its own enable switch (off disables try-on, apply and the background controls).
 
@@ -14,6 +27,17 @@ English | [中文](README.zh.md)
 - Background controls: a background-occlusion slider (0–100%) veils the backdrop behind the panels for skins that paint one, two per-state Gaussian-blur sliders (0–20 px) control the backdrop for empty and populated conversations, an input-card blur slider (0–20 px) controls only the frosted area behind the composer, and a bubble-opacity slider (0–100%) drives translucent message bubbles for skins that expose bubble alpha. Wallpaper-wide blur remains an independent wallpaper setting. The active background blur uses a fixed `backdrop-filter` element behind the shell; 0 disables it entirely (no element, no GPU cost). The input-card frost rides its own body-level fixed follower (the `data-dsh-composer-frost` element) sized to the composer card, never the card itself: a `backdrop-filter` on the card would make it the containing block for the shell's fixed tooltips inside it and jolt the conversation on every hover.
 - Wallpaper Engine bridge: the card can use the machine's local Wallpaper Engine library as the GUI backdrop. The host half (`src/we-library.ts` + `src/we-routes.ts`) locates the WE install (Steam app 431960: registry, every path in `libraryfolders.vdf`, durable `appmanifest_431960.acf` ownership, and probe paths on Windows), scans its projects and workshop content plus optional manual folders, and serves the inventory, media (Range-streamed), previews, web-wallpaper project files (with the WE API shim injected), and scene main-texture PNGs (decoded in-process from PKG/TEX by `src/pkg-extract.ts`, cached on disk) through same-origin `/api/skin-center/we/*` routes. Video wallpapers render in a `<video>`, web wallpapers in a sandboxed `<iframe>`, scene wallpapers live in the built-in WebGL player (2D layered scenes and 3D model scenes replayed with WE material/shader semantics); scene-embedded scripts are ignored while supported image, reflection, water and particle passes remain live, and a "static frame" render mode pins a zero-animation-cost image for any type. Per-wallpaper Import copies the project into `<harness-home>/skin-center/wallpapers/` so it survives Steam library changes, with update detection against the workshop original. Wallpapers are the user's own local files and are never uploaded or redistributed — Workshop content belongs to its authors. The Manual folders row accepts loose `.mp4`/`.webm` media, one project, a project collection, a Wallpaper Engine install root, or a Steam library root (`~` expands to the home directory).
 - Legacy migration: on the first boot after the v2 upgrade, a one-shot bridge (`src/legacy-bridge.ts`) reads the retired `dsh-skin` managed section from the harness home `cordis.patch.yml` (where the v1 CLI wrote it; the active profile's `cordis.patch.yml` is probed as a secondary location), migrates the active skin id into the v2 selection store, and strips the legacy rows. The migration is idempotent and fails closed (the old state stays untouched on any error). It logs only when it migrated, cleaned, or failed — the nothing-to-migrate steady state stays silent (issue #788).
+
+
+## Core Capabilities & Scenarios
+
+| User Goal & Scenario | Stock DSH Web Limitation | Skin Center (dsh-skins) Solution |
+|---|---|---|
+| Personalized aesthetics and eye-care dark theme | Default single monochrome theme only | Bundled Blue Fantasy dark theme + one-click install for dozens of curated themes from Workshop |
+| Interactive dynamic wallpaper via Wallpaper Engine | No dynamic video or animated wallpaper support | Deep Steam Wallpaper Engine bridge supporting video, web, and 2D/3D WebGL real-time scenes |
+| Frosted glass blur & composer scrim controls | Flat background with no visual depth or layering | Background scrim (0–100%), adaptive conversation blur, follower frosted composer glass & bubble opacity |
+| Custom brand palette & CSS token remapping | Unable to tweak accent colors or contrast | Independent light/dark accent, background, foreground and contrast tuning with audited CSS token coverage |
+| Live theme try-on and zero-flash hot switching | Theme changes require server restarts or reloads | Atomic hot-switch engine for live preview, clean rollback, and instant boot without white FOUC flashes |
 
 ## Most popular skins
 
