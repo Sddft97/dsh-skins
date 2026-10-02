@@ -1,6 +1,10 @@
 {
   "version": 1,
-  "comment": "Repository submission policy. blockedContributors: accounts whose pull requests are closed without review (enforced by .github/workflows/submission-policy.yml). prohibitedWorks: subjects refused at the copyright gate whatever account offers them (documented in CONTRIBUTING.md and .agents/notes/implemented/process/2026-10-02-submission-policy-blocklist-and-prohibited-works.md).",
+  "comment": "Repository submission policy. blockedContributors: accounts whose pull requests are closed without review. prohibitedWorks: subjects refused at the copyright gate; an entry may also declare matchPatterns, which close a pull request whose title or description announces it. evidence: where a skin pull request must commit the screenshots it pastes into its description, and how many are required. Enforced by .github/workflows/submission-policy.yml and scripts/submission-policy.mjs / scripts/verify-evidence.mjs.",
+  "evidence": {
+    "directory": "evidence",
+    "requiredImages": 2
+  },
   "blockedContributors": [
     {
       "login": "LOrz-3",
@@ -11,12 +15,33 @@
   "prohibitedWorks": [
     {
       "id": "deepseek-meridian-character",
+      "kind": "work",
       "addedAt": "2026-10-02",
       "reason": "Copyright. The character's provenance as the contributor's own original work is not established, and the maintainer has ruled the subject out of the catalog.",
       "description": "The character created for the removed meridian skin: an anime-style young adult male with medium-length deep-blue hair, pale grey-blue eyes and dark navy clothing, presented as a DeepSeek male-character concept. Submissions that depict, trace, recolour or adapt this character are refused at intake whatever account they come from.",
+      "matchPatterns": [
+        "deepseek[-_ ]?meridian",
+        "feat\\(skins\\):\\s*add\\s+meridian"
+      ],
       "references": [
         "skins/meridian/ (removed in 3807432; recoverable from git history 0f86e0d)",
         ".agents/notes/implemented/process/2026-10-02-skin-takedown-meridian.md"
+      ]
+    },
+    {
+      "id": "deepseek-male-persona-skins",
+      "kind": "category",
+      "addedAt": "2026-10-02",
+      "reason": "Maintainer decision. The whole category is refused, not only the one character: a pull request whose title or description announces this type is closed without review, and a submission that turns out to depict it is refused at the copyright gate.",
+      "description": "Skins built around a DeepSeek male persona (DeepSeek 男性形象皮肤) - a male character presented as the DeepSeek image, in the manner of the removed meridian skin. This is a category rule: it covers any character in that framing, not a single design.",
+      "matchPatterns": [
+        "DeepSeek\\s*(男性|男)\\s*形象",
+        "男性形象\\s*(皮肤|skin)",
+        "deepseek[-_ ]?male[-_ ]?(character|skin)",
+        "male[-_ ]?character[-_ ]?skin"
+      ],
+      "references": [
+        ".agents/notes/implemented/process/2026-10-02-submission-policy-blocklist-and-prohibited-works.md"
       ]
     }
   ]

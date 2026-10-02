@@ -40,9 +40,20 @@ which is the single source for them; run
   without review by `.github/workflows/submission-policy.yml`. The list is
   maintained by the repository owner; a listed account asks the owner to
   reconsider in an issue, not in a new pull request.
-- **Prohibited works.** A submission that depicts a listed work is refused at
-  the copyright gate whatever account it comes from. Each entry records the
-  subject, the date it was prohibited and the reason.
+- **Prohibited works and categories.** A submission that depicts a listed work,
+  or that belongs to a listed category (currently the DeepSeek male-persona skin
+  type), is refused at the copyright gate whatever account it comes from. An
+  entry may also declare keywords: a pull request whose title or description
+  announces one is closed without review. Each entry records the subject, the
+  date it was prohibited and the reason.
+- **Evidence that can be checked.** A skin pull request embeds its two
+  screenshots (light and dark) in the description and commits the same two files
+  under `evidence/`. CI downloads every image the description references and
+  requires a byte-identical (`sha256`) file among the `evidence/` files the pull
+  request commits; a missing image, a mismatch, or a link that cannot be
+  downloaded closes the pull request without review. Only a match hands the
+  submission to the gates - a screenshot that does not correspond to the
+  submitted source proves nothing about it.
 
 Copyright review is part of intake, not a formality. Every artwork asset a skin
 ships must declare its source (the manifest's `license`, `licenseUrl` or

@@ -17,6 +17,7 @@ import {
   BLOCKED_EXIT_CODE,
   POLICY_VERSION,
   findBlockedContributor,
+  findProhibitedSubject,
   loadPolicy,
   prohibitedWorks,
 } from './submission-policy.mjs'
@@ -63,9 +64,9 @@ test('a crashed checker can never read as a blocked contributor', () => {
   assert.notEqual(crash.status, BLOCKED_EXIT_CODE)
 })
 
-test('the workflow closes on the same exit code the checker uses', () => {
+test('the workflow acts on the same exit code the checker uses', () => {
   const workflow = readFileSync(join(ROOT, '.github', 'workflows', 'submission-policy.yml'), 'utf8')
-  assert.match(workflow, new RegExp('\\n\\s*' + BLOCKED_EXIT_CODE + '\\) echo "blocked=true"'))
+  assert.match(workflow, new RegExp('^\\s*' + BLOCKED_EXIT_CODE + '\\) .*close-reason', 'm'))
 })
 
 test('a usage error exits 2, never 1', () => {
@@ -89,6 +90,65 @@ test('the prohibited work points at a record that exists', () => {
     const path = reference.split(' ')[0]
     if (path.endsWith('/')) continue
     assert.ok(existsSync(join(ROOT, path)), path + ' must exist')
+  }
+})
+
+test('the prohibited category catches an announced DeepSeek male persona', () => {
+  const policy = loadPolicy()
+  const cases = [
+    'Adds a DeepSeek 男性形象皮肤 for the sidebar',
+    'a DeepSeek male character skin for the brand row',
+    'adds another male character skin',
+  ]
+  for (const text of cases) {
+    const match = findProhibitedSubject(policy, text)
+    assert.ok(match, text + ' must match')
+    assert.equal(match.entry.id, 'deepseek-male-persona-skins')
+  }
+})
+
+test('the removed character is refused by name too', () => {
+  const match = findProhibitedSubject(loadPolicy(), 're-submits DeepSeek-Meridian under a new id')
+  assert.ok(match)
+  assert.equal(match.entry.id, 'deepseek-meridian-character')
+})
+
+test('a neutral submission matches no prohibited subject', () => {
+  assert.equal(findProhibitedSubject(loadPolicy(), 'Adds a quiet dark theme; evidence screenshots attached.'), null)
+})
+
+test('the CLI refuses a prohibited subject with the blocked exit code', () => {
+  const sandbox = mkdtempSync(join(tmpdir(), 'submission-policy-'))
+  try {
+    const file = join(sandbox, 'body.md')
+    writeFileSync(file, 'Adds a DeepSeek 男性形象皮肤')
+    assert.equal(run(['--text-file', file]).status, BLOCKED_EXIT_CODE)
+    writeFileSync(file, 'Adds a quiet dark theme')
+    assert.equal(run(['--text-file', file]).status, 0)
+  } finally {
+    rmSync(sandbox, { recursive: true, force: true })
+  }
+})
+
+test('the evidence rule points outside skins/, where it would ship to users', () => {
+  const policy = loadPolicy()
+  assert.ok(policy.evidence, 'the policy declares the evidence rule')
+  assert.ok(!policy.evidence.directory.startsWith('skins/'), 'evidence images must not ship inside a skin package')
+  assert.ok(policy.evidence.requiredImages >= 2)
+})
+
+test('a prohibited work with an invalid matchPattern fails validation', () => {
+  const sandbox = mkdtempSync(join(tmpdir(), 'submission-policy-'))
+  try {
+    const file = join(sandbox, 'policy.json')
+    writeFileSync(file, JSON.stringify({
+      version: POLICY_VERSION,
+      blockedContributors: [],
+      prohibitedWorks: [{ id: 'x', addedAt: '2026-10-02', reason: 'r', description: 'd', matchPatterns: ['('] }],
+    }))
+    assert.throws(() => loadPolicy(file), /not a valid regular expression/)
+  } finally {
+    rmSync(sandbox, { recursive: true, force: true })
   }
 })
 

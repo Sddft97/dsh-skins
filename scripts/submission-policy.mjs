@@ -9,6 +9,7 @@
  *
  * Usage:
  *   node scripts/submission-policy.mjs --login <github-login>   # exit 3 = blocked
+ *   node scripts/submission-policy.mjs --text-file <path>       # exit 3 = prohibited subject
  *   node scripts/submission-policy.mjs --list                   # print the policy
  *
  * Exit codes: 0 allowed, 3 blocked, 2 usage or malformed policy. Blocked is 3
@@ -82,7 +83,29 @@ export function loadPolicy(file = POLICY_FILE) {
     requireDate(entry.addedAt, where + '.addedAt')
     requireString(entry.reason, where + '.reason')
     requireString(entry.description, where + '.description')
+    if (entry.matchPatterns !== undefined) {
+      if (!Array.isArray(entry.matchPatterns)) fail(where + '.matchPatterns must be an array')
+      entry.matchPatterns.forEach((pattern, patternIndex) => {
+        const at = where + '.matchPatterns[' + patternIndex + ']'
+        requireString(pattern, at)
+        try {
+          new RegExp(pattern, 'i')
+        } catch (error) {
+          fail(at + ' is not a valid regular expression: ' + error.message)
+        }
+      })
+    }
   })
+
+  if (policy.evidence !== undefined) {
+    if (policy.evidence === null || typeof policy.evidence !== 'object' || Array.isArray(policy.evidence)) {
+      fail('evidence must be an object')
+    }
+    requireString(policy.evidence.directory, 'evidence.directory')
+    if (!Number.isInteger(policy.evidence.requiredImages) || policy.evidence.requiredImages < 1) {
+      fail('evidence.requiredImages must be a positive integer')
+    }
+  }
 
   return policy
 }
@@ -98,6 +121,20 @@ export function findBlockedContributor(policy, login) {
 /** The prohibited works the copyright gate must refuse. */
 export function prohibitedWorks(policy) {
   return policy.prohibitedWorks
+}
+
+/**
+ * The prohibited work whose declared matchPatterns hit the text, or null.
+ * Entries without matchPatterns are judged by a human at the copyright gate.
+ */
+export function findProhibitedSubject(policy, text) {
+  if (typeof text !== 'string' || text.trim() === '') return null
+  for (const entry of policy.prohibitedWorks) {
+    for (const pattern of entry.matchPatterns ?? []) {
+      if (new RegExp(pattern, 'i').test(text)) return { entry, pattern }
+    }
+  }
+  return null
 }
 
 /** CLI entry point; returns the process exit code. */
@@ -117,6 +154,21 @@ export function main(argv = process.argv.slice(2)) {
         return BLOCKED_EXIT_CODE
       }
       console.log('submission-policy: ' + login + ' is not a blocked contributor')
+      return 0
+    }
+    const textFlag = argv.indexOf('--text-file')
+    if (textFlag !== -1) {
+      const file = argv[textFlag + 1] ?? ''
+      if (file === '') {
+        console.error('usage: node scripts/submission-policy.mjs --text-file <path>')
+        return 2
+      }
+      const match = findProhibitedSubject(loadPolicy(), readFileSync(file, 'utf8'))
+      if (match) {
+        console.log('submission-policy: prohibited subject ' + match.entry.id + ' (matched ' + JSON.stringify(match.pattern) + ')')
+        return BLOCKED_EXIT_CODE
+      }
+      console.log('submission-policy: no prohibited subject in the text')
       return 0
     }
     if (argv.includes('--list')) {

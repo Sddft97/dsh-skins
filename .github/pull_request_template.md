@@ -17,6 +17,22 @@
       holder, and no asset depicts a work on the prohibited list
       (\`.github/submission-policy.json\`)
 
+## Evidence
+
+A skin change ships two screenshots (light and dark) in the description, and
+the same two files in the diff:
+
+- [ ] Two screenshots are embedded in this description, light theme and dark theme
+- [ ] The same two images are committed verbatim under \`evidence/\`
+      (\`evidence/<skin-id>-light.<ext>\`, \`evidence/<skin-id>-dark.<ext>\`)
+- [ ] The embedded image and the committed file are the same bytes: CI downloads
+      every image this description references and compares its sha256 with each
+      \`evidence/\` file this pull request commits. A missing image, a mismatch or
+      a link that cannot be downloaded closes the pull request without review.
+
+\`node scripts/submission-policy.mjs --list\` prints the current evidence rule
+and the prohibited subjects.
+
 ## Verification
 
 <!-- Paste the commands you ran and their result. -->
