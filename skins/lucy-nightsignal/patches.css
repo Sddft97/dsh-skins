@@ -26,15 +26,11 @@
 [id="root"] {
   background: none;
   position: relative;
-padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
-margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 body {
   isolation: isolate;
   --lucy-wing-gap: clamp(6px, 1vw, 22px);
-padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
-margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 /* The Windows desktop host paints `--dsw-specific-sidebar-fill` on the
@@ -42,8 +38,6 @@ margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !import
    and would crush the background illustration. */
 [class*="_frame"] {
   background: transparent !important;
-padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
-margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 /* 2 ---------------------------------------------------------------------- */
@@ -64,8 +58,6 @@ margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !import
 ) {
   --dsh-chat-user-width: min(clamp(420px, 38vw, 700px), calc(100% - 24px)) !important;
   --dsh-chat-content-width: min(clamp(420px, 38vw, 700px), calc(100% - 24px)) !important;
-padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
-margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 /* 3 ---------------------------------------------------------------------- */
@@ -95,8 +87,6 @@ margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !import
 [data-composer-seat],
 [data-dsh-surface="composer"] {
   anchor-name: --lucy-composer;
-padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
-margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 body:before,
@@ -116,8 +106,6 @@ body:after {
   opacity: 1;
   filter: saturate(1.06) contrast(1.04) drop-shadow(0 22px 30px #04101f5c);
   transition: left 0.3s cubic-bezier(0.22, 0.78, 0.2, 1), right 0.3s cubic-bezier(0.22, 0.78, 0.2, 1), height 0.6s cubic-bezier(0.22, 0.78, 0.2, 1);
-padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
-margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 /* Left portrait: back view, right edge on the card's left edge. */
@@ -131,8 +119,6 @@ body:before {
   background-image:
     radial-gradient(58% 46% at 55% 72%, #dfeaf459, #dfeaf400 72%),
     url("assets/lucy-signal-left.webp");
-padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
-margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 /* Right portrait: front view, left edge on the card's right edge. Its height is
@@ -146,8 +132,6 @@ body:after {
   background-image:
     radial-gradient(58% 46% at 45% 72%, #dfeaf459, #dfeaf400 72%),
     url("assets/lucy-signal-right.webp");
-padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
-margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 /* No pane-aware hiding: an earlier revision hid the right portrait whenever the
@@ -160,16 +144,12 @@ body[data-ds-dark-theme]:before {
   background-image:
     radial-gradient(58% 46% at 55% 72%, #0a1526a6, #0a152600 72%),
     url("assets/lucy-signal-left.webp");
-padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
-margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 body[data-ds-dark-theme]:after {
   background-image:
     radial-gradient(58% 46% at 45% 72%, #0a1526a6, #0a152600 72%),
     url("assets/lucy-signal-right.webp");
-padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
-margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 @media (width <= 900px) {
@@ -177,8 +157,6 @@ margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !import
   body:after {
     display: none;
   }
-padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
-margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 /* 4 ---------------------------------------------------------------------- */
@@ -194,8 +172,6 @@ margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !import
   height: 2px;
   pointer-events: none;
   background: linear-gradient(90deg, #22d3ee00 0%, #22d3ee8c 22%, #e879f98c 68%, #22d3ee00 100%);
-padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
-margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 /* Sidebar: cyan edge + a faint inner glow so the glass reads as glass. */
@@ -203,53 +179,67 @@ margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !import
 [class*="sidebarCol"] {
   border-right: 1px solid #22d3ee3d;
   box-shadow: inset -18px 0 32px -28px #22d3ee8c;
-padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
-margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 [data-ds-dark-theme] [data-dsh-surface="sidebar"],
 [data-ds-dark-theme] [class*="sidebarCol"] {
   border-right-color: #22d3ee47;
   box-shadow: inset -18px 0 36px -26px #22d3eea6;
-padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
-margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 /* Session header: a whisper of magenta under the title row. */
 :is([data-slot="conversation.session.header"], [data-dsh-surface="session-header"]) {
   border-bottom: 1px solid transparent;
   border-image: linear-gradient(90deg, #22d3ee40, #e879f959, #22d3ee00) 1;
-padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
-margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 /* Composer: neon focus ring on the input card. */
 :is([data-composer-seat], [data-composer-card], [data-dsh-surface="composer"]) {
   border-radius: 18px;
   box-shadow: 0 0 0 1px #22d3ee3d, 0 14px 34px #04101f26;
-padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
-margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 [data-ds-dark-theme] :is([data-composer-seat], [data-composer-card], [data-dsh-surface="composer"]) {
   box-shadow: 0 0 0 1px #22d3ee4d, 0 16px 40px #00000073;
-padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
-margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 :is([data-composer-seat], [data-composer-card], [data-dsh-surface="composer"]):focus-within {
   box-shadow: 0 0 0 1px #22d3ee8c, 0 0 22px -4px #22d3ee59, 0 16px 40px #04101f33;
-padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
-margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
 /* Scrollbars pick up the accent instead of the neutral grey. */
 :is([data-conversation-scroll], [data-dsh-part="scrollport"]) {
   scrollbar-color: #22d3ee59 transparent;
-padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
-margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
 
+/* --- 5. the details pane yields the space she stands in ---
+ *
+ * With the details pane open the input card's right edge sits only ~28px left of
+ * the pane, while the right portrait is about 352px wide: without help she
+ * lies across the pane's content. Measured on the live shell (viewport 1707x912):
+ * the pane host is 768px wide starting at x=939 and the pane's first card started
+ * at x=1134, i.e. under her. What is needed is only the *additional* clearance: at inset 0 the pane's own
+ * indent already puts its first card at x=1145 while her visible silhouette
+ * ends at x=1154, so ~80-90px of extra inset clears her with breathing room.
+ * (Her artwork's solid pixels occupy just 62.5% of the canvas width, so her box
+ * overstates her by a third.)
+ *
+ * The host inside the pane is the element that actually lays the content out
+ * (`[class*="_pane_"]` under `[data-rightbar-col]`); padding on the pane itself
+ * does nothing because the host is positioned against the pane's padding box.
+ */
+[class*="_frame"]:not([data-rightbar-collapsed]) [data-rightbar-col] [class*="_pane_"] {
+  padding-left: clamp(24px, calc(clamp(460px, 76vh, 1040px) * 0.13), 140px) !important;
+  box-sizing: border-box;
+}
+
+
+/* The in-GUI browser panel is the exception: its page surface (`<webview>`) is laid
+ * out inside the host, so the host inset already moves it, but that still leaves the
+ * page's left edge under her (measured: webview at x=1051 vs her visible edge 1132).
+ * The webview itself accepts a margin, so give it the last stretch. Nothing else in
+ * the pane is affected, which keeps the card panels from being pushed too far.
+ */
 [class*="_frame"]:not([data-rightbar-collapsed]) [data-rightbar-col] [class*="webview"] {
   margin-left: clamp(48px, calc(clamp(460px, 76vh, 1040px) * 0.11), 118px) !important;
 }
