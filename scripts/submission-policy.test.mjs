@@ -8,12 +8,13 @@
  */
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import {
+  BLOCKED_EXIT_CODE,
   POLICY_VERSION,
   findBlockedContributor,
   loadPolicy,
@@ -50,10 +51,21 @@ test('an unlisted contributor is allowed with exit code 0', () => {
   assert.equal(result.status, 0)
 })
 
-test('the CLI reports a blocked contributor with exit code 1', () => {
+test('the CLI reports a blocked contributor with the blocked exit code', () => {
   const result = run(['--login', 'LOrz-3'])
-  assert.equal(result.status, 1)
+  assert.equal(result.status, BLOCKED_EXIT_CODE)
   assert.match(result.stdout, /blocked contributor LOrz-3/)
+})
+
+test('a crashed checker can never read as a blocked contributor', () => {
+  const crash = spawnSync(process.execPath, [join(ROOT, 'scripts', 'missing-policy-checker.mjs')], { encoding: 'utf8' })
+  assert.equal(crash.status, 1, 'the Node runtime reports a missing module as exit 1')
+  assert.notEqual(crash.status, BLOCKED_EXIT_CODE)
+})
+
+test('the workflow closes on the same exit code the checker uses', () => {
+  const workflow = readFileSync(join(ROOT, '.github', 'workflows', 'submission-policy.yml'), 'utf8')
+  assert.match(workflow, new RegExp('\\n\\s*' + BLOCKED_EXIT_CODE + '\\) echo "blocked=true"'))
 })
 
 test('a usage error exits 2, never 1', () => {

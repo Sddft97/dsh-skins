@@ -27,9 +27,10 @@ One policy file, one checker, one workflow.
   references). It is the single source; the gates, the pull request template and
   the workflow read it instead of keeping copies.
 - `scripts/submission-policy.mjs` validates the file and answers one question
-  (`--login <login>`). It exits 1 for a blocked account, 0 for an allowed one and
-  2 for a malformed policy, so a broken policy file can never be mistaken for a
-  contributor to refuse.
+  (`--login <login>`). It exits 3 for a blocked account, 0 for an allowed one and
+  2 for a malformed policy. Blocked is deliberately not 1: the Node runtime exits
+  1 for a missing module or any other crash, and a checker that cannot run must
+  never be read as a contributor to refuse.
 - `.github/workflows/submission-policy.yml` runs on `pull_request_target` for
   opened / reopened / ready_for_review pull requests, checks out the base commit
   (never the pull request's code) and, when the author is blocked, posts the

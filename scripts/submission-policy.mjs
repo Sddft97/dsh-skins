@@ -8,12 +8,13 @@
  * review gates and the documentation, so none of them keeps a second list.
  *
  * Usage:
- *   node scripts/submission-policy.mjs --login <github-login>   # exit 1 = blocked
+ *   node scripts/submission-policy.mjs --login <github-login>   # exit 3 = blocked
  *   node scripts/submission-policy.mjs --list                   # print the policy
  *
- * Exit codes: 0 allowed, 1 blocked, 2 usage or malformed policy. A caller that
- * closes a pull request must tell 1 apart from the error codes: a broken policy
- * file is a repository defect, not a reason to refuse a contributor.
+ * Exit codes: 0 allowed, 3 blocked, 2 usage or malformed policy. Blocked is 3
+ * and not 1 on purpose: the Node runtime exits 1 for a missing module or any
+ * other uncaught error, and a caller that closes a pull request must never read
+ * a crashed checker as a contributor to refuse.
  */
 import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
@@ -22,6 +23,8 @@ import { fileURLToPath } from 'node:url'
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 export const POLICY_FILE = join(ROOT, '.github', 'submission-policy.json')
 export const POLICY_VERSION = 1
+/** Exit code for a blocked contributor. See the exit-code note above. */
+export const BLOCKED_EXIT_CODE = 3
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const LOGIN_RE = /^[A-Za-z0-9-]+$/
 
@@ -111,7 +114,7 @@ export function main(argv = process.argv.slice(2)) {
       const blocked = findBlockedContributor(policy, login)
       if (blocked) {
         console.log('submission-policy: blocked contributor ' + blocked.login + ' (since ' + blocked.blockedAt + ')')
-        return 1
+        return BLOCKED_EXIT_CODE
       }
       console.log('submission-policy: ' + login + ' is not a blocked contributor')
       return 0
