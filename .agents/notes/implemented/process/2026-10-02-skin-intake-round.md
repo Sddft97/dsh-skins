@@ -15,8 +15,8 @@ honestly reported as unknown by the contributor.
 
 ## Decision
 
-**#30 (crt-phosphor) and #31 (black-gold-vip) are merged. #24, #29, #32 and
-#33 stay open with a named blocker each.**
+**#30 (crt-phosphor), #31 (black-gold-vip) and #32 (xinghai-heart) are merged.
+#24, #29 and #33 stay open with a named blocker each.**
 
 **#30 (crt-phosphor): merged as `719feaf9`.** The declaration gap from the
 2026-10-01 round is closed: both READMEs and `assets/NOTICE.md` now name the
@@ -51,16 +51,22 @@ because this is a first-time contributor's pull request and its CI run sat in
 (run 36867382872). Named next step: delete the stray declarations and get the
 catalog gate green.
 
-**#32 (xinghai-heart): held - the provenance classification is missing.** The
-aesthetics pass (the footage is pointillist and the dotted decoration language
-matches it; the empty session now draws nothing), the engineering is the
-contributor's original work, and the skin clears the size ceiling at 14.26 MB.
-The contributor explicitly flagged that the footage's own classification -
-original render, AI-generated, or adapted - is not asserted in `skin.json` or
-the READMEs and could not be verified from the files. The declaration gate asks
-for the source of the artwork, so a self-declared unknown is a hold, not a
-pass. Named next step: confirm the classification with the author and record it
-in `skin.json`'s `attribution` and both READMEs.
+**#32 (xinghai-heart): merged as `547a5ccc` after the classification
+landed.** The first review held it because the contributor had explicitly
+flagged the footage's own classification - original render, AI-generated, or
+adapted - as unasserted in `skin.json` and the READMEs, and the declaration
+gate asks for the source of the artwork rather than accepting a blank. The
+contributor confirmed it with the author and landed it in `65348ac`: the
+attribution and both READMEs now classify the footage as AI-generated from the
+same pipeline as the author's `rainy-night` skin (the author's own prompts and
+reference images, not a repost, no third-party material), cite the source
+file's CapCut/JianYing export metadata, and carry the personal-non-commercial /
+unofficial / not-affiliated-with-this-repository / rights-remain wording. The
+outstanding-item note is gone from all three files. The commit touched only
+`skin.json` and the two READMEs, so the preview's, the assets' and both
+stylesheets' bytes are identical to the reviewed head and the earlier aesthetic
+verdict stands; `dsh-skin validate` passes, `skin-center:check` and
+`skin-hooks:check` are green, and CI passed on `65348ac`.
 
 **#24 (endfield-baker): unchanged, still waiting on the author.** The
 2026-09-30 review's two items stand and the branch has had no new commit since
@@ -96,7 +102,9 @@ or adapted. Named next step: add the required terms to both READMEs and
 - **Treating #32's honest "classification not asserted" as an acceptable open
   item.** Rejected. The declaration gate exists because provenance cannot be
   reconstructed after the fact; accepting a blank would set the precedent that
-  the field is optional.
+  the field is optional. The contributor resolved it by getting the
+  classification from the author rather than from inference, and the
+  classification is now recorded where the gate reads it.
 - **Re-classifying #33's two skins into one entry because they share a
   component language.** Rejected. They are independently installable
   directories with their own manifests and previews, and the repository catalog
@@ -110,8 +118,8 @@ or adapted. Named next step: add the required terms to both READMEs and
 
 ## Consequences
 
-- Two skins are published to the market and three stay open with one named item
-  each, so the next round only re-checks that item.
+- Three skins are published to the market and three stay open with one named
+  item each, so the next round only re-checks that item.
 - The round records an operational failure mode worth keeping: a first-time
   contributor's CI can be green-on-the-checks-API only after a maintainer
   approves the run, and until then a red catalog gate is invisible. Every head
