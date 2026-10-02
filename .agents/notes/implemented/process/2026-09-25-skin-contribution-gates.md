@@ -21,9 +21,16 @@ character art with no licensing record anywhere in the tree.
 ## Decision
 
 Intake decisions for skin pull requests apply three gates, all three required
-before merge. The gate definitions and their rationale live in the maintenance
-workflow; what this note fixes is how this repository records the outcome.
+before merge, and two refusal rules that run in front of them. The gate
+definitions and their rationale live in the maintenance workflow; what this note
+fixes is how this repository records the outcome.
 
+- **Two refusal rules run before the gates.** A prohibited work is refused on
+  copyright grounds whatever the rest of the submission looks like, and a pull
+  request from a blocked account is closed without review. Both lists are data
+  in [.github/submission-policy.json](../../../../.github/submission-policy.json),
+  enforced by `.github/workflows/submission-policy.yml`; the decision is
+  recorded in [the submission policy note](2026-10-02-submission-policy-blocklist-and-prohibited-works.md).
 - **Evidence must be reproducible against the pull request's own code.** A
   screenshot or video counts only when the branch serving it carries the pull
   request's bytes, and when the change it claims to prove is visible in the

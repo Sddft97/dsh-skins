@@ -1,0 +1,48 @@
+name: Submission policy
+
+# Closes pull requests opened by a blocked contributor without review.
+#
+# pull_request_target with the checkout pinned to the base commit, so the policy
+# file and this workflow always come from the base branch: a fork cannot edit
+# them, and the pull request's own code is never checked out or executed here.
+
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  blocked-contributor:
+    name: Refuse submissions from a blocked account
+    if: github.repository == 'zhu1090093659/dsh-skins'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the base branch policy
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+      - name: Evaluate the submission policy
+        id: policy
+        env:
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          set +e
+          node scripts/submission-policy.mjs --login "$PR_AUTHOR"
+          code=$?
+          set -e
+          case "$code" in
+            0) echo "blocked=false" >> "$GITHUB_OUTPUT" ;;
+            1) echo "blocked=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "submission-policy: checker exited $code; leaving the pull request open" >&2; exit "$code" ;;
+          esac
+      - name: Close the submission
+        if: steps.policy.outputs.blocked == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr comment "$PR_NUMBER" --body-file .github/submission-policy-notice.md
+          gh pr close "$PR_NUMBER"

@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "comment": "Repository submission policy. blockedContributors: accounts whose pull requests are closed without review (enforced by .github/workflows/submission-policy.yml). prohibitedWorks: subjects refused at the copyright gate whatever account offers them (documented in CONTRIBUTING.md and .agents/notes/implemented/process/2026-10-02-submission-policy-blocklist-and-prohibited-works.md).",
+  "blockedContributors": [
+    {
+      "login": "LOrz-3",
+      "blockedAt": "2026-10-02",
+      "reason": "Maintainer decision following the meridian skin takedown (dsh-skins commit 3807432). Pull requests from this account are closed without review."
+    }
+  ],
+  "prohibitedWorks": [
+    {
+      "id": "deepseek-meridian-character",
+      "addedAt": "2026-10-02",
+      "reason": "Copyright. The character's provenance as the contributor's own original work is not established, and the maintainer has ruled the subject out of the catalog.",
+      "description": "The character created for the removed meridian skin: an anime-style young adult male with medium-length deep-blue hair, pale grey-blue eyes and dark navy clothing, presented as a DeepSeek male-character concept. Submissions that depict, trace, recolour or adapt this character are refused at intake whatever account they come from.",
+      "references": [
+        "skins/meridian/ (removed in 3807432; recoverable from git history 0f86e0d)",
+        ".agents/notes/implemented/process/2026-10-02-skin-takedown-meridian.md"
+      ]
+    }
+  ]
+}
