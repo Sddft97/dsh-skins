@@ -15,8 +15,8 @@ honestly reported as unknown by the contributor.
 
 ## Decision
 
-**#30 (crt-phosphor) and #31 (black-gold-vip) are merged. #29, #32 and #24
-stay open with a named blocker each.**
+**#30 (crt-phosphor) and #31 (black-gold-vip) are merged. #24, #29, #32 and
+#33 stay open with a named blocker each.**
 
 **#30 (crt-phosphor): merged as `719feaf9`.** The declaration gap from the
 2026-10-01 round is closed: both READMEs and `assets/NOTICE.md` now name the
@@ -67,6 +67,25 @@ in `skin.json`'s `attribution` and both READMEs.
 `11d26ae1`. Its CI is green (the earlier `action_required` run was approved in
 this round).
 
+**#33 (midnight-contract + midnight-contract-city): held - the third-party
+character artwork has no license record.** Both directories are independently
+installable, pass `dsh-skin validate` and `pnpm skin-center:check` (55 skins)
+on head `1da6b08`, declare no remote asset and no executable hook, and carry
+thirty-plus real host captures covering both themes, desktop and mobile. The
+aesthetics pass (the character is uncropped, panel contrast holds in both
+themes, light and dark are both complete). What is missing is gate 2: the
+supplied left-hand background is a character illustration from the *Dragon
+Raja* franchise, so the record must name the character and its work, the rights
+holders, and the personal-non-commercial / unofficial / unrelated-to-this-
+repository / rights-reserved terms. `NOTICE.md` carries only "No ownership of
+the Dragon Raja franchise or its characters is claimed, and no official
+endorsement is implied", and grepping the two skin directories for
+`non-commercial`, `unofficial`, `not affiliated`, `非商业` or `无关联` finds
+nothing. `asset-provenance.json` also records the background only as
+"Contributor-provided image" without classifying it as original, AI-generated
+or adapted. Named next step: add the required terms to both READMEs and
+`NOTICE.md`, and classify the background in `asset-provenance.json`.
+
 ## Alternatives considered
 
 - **Merging #29 on the strength of the now-complete declaration and treating the
@@ -82,6 +101,12 @@ this round).
   component language.** Rejected. They are independently installable
   directories with their own manifests and previews, and the repository catalog
   is per directory.
+- **Accepting #33's "no official endorsement is implied" line as satisfying
+  gate 2 for the character background.** Rejected. The gate asks for the
+  personal-non-commercial scope, the non-affiliation with this repository, and
+  the rights-holder reservation, none of which that sentence states; #30's
+  declaration is the model for what the paragraph should look like, and the
+  earlier rounds held submissions for exactly this gap.
 
 ## Consequences
 
