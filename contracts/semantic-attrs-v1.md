@@ -69,7 +69,13 @@ family / 插件区域：
 | `sidebar-entry` | shell（行盒）+ 注册插件（身份） | 插件经 `sidebar.panellist` 注册的侧栏面板行（任务看板 / ssh / 技能中心；官方 Plugins / Schedule 行不属此值）。行盒归 shell，兼容适配器按 `[class*="panelRow"]:has([data-dsh-panel-entry])` 补打——CSS-module 后缀 + 插件字形身份，同 `new-session` 手法；上游诉求见下文脆弱点 2 |
 | `header` | task-board | 看板头；`[data-dsh-taskboard-board] > header` |
 | `column` | task-board | 状态列；`section[data-status]` |
-| `card` | task-board | 任务卡；列内 `[data-status]` 条目 |
+| `card` | task-board | 任务卡；列内 `article[data-status]` 条目，`data-tone` 为最近执行结果（running / succeeded / failed / cancelled，无执行或归档时缺省），`data-compact` 标记紧凑密度 |
+| `card-open` | task-board | 铺满卡片的透明打开按钮（键盘与读屏入口）；`article[data-dsh-part="card"] > button[data-dsh-part="card-open"]` |
+| `card-title` / `card-kind` / `card-excerpt` / `card-time` / `card-run` | task-board | 卡片标题、标题类型徽章（`[Bug]:` 前缀）、描述摘要、按列选择的时间标签、最近执行结果与次数；均在 `[data-dsh-part="card"]` 内 |
+| `card-session` | task-board | 卡片上打开最近执行会话的快捷按钮 |
+| `card-group` / `card-group-toggle` | task-board | 已结算列的时间分组（`data-group` 为 today / week / earlier）与折叠开关 |
+| `density-toggle` | task-board | 列头的紧凑/完整卡片切换；`aria-pressed` 表示紧凑 |
+| `github-badge` | task-board-github | 卡片 meta 行内的 Issue 编号徽章；URL 为 http(s) 时是新标签打开的 `a`，否则为 `span` |
 | `detail` | task-board | 任务详情面板 |
 | `tag-filter` | task-board | 标签筛选条；`[data-dsh-taskboard-board] [data-dsh-part="tag-filter"]` |
 | `tag-chip` | task-board | 筛选条内的标签胶囊；`[data-dsh-part="tag-chip"]`，`data-tag-tone` 为 0-5 调色板槽 |
