@@ -128,6 +128,12 @@ describe('orca-link sidebar stage geometry', () => {
   const panelList = onlyRule(rules, 'wide panel list offset', (rule) => (
     rule.context === '' && rule.selector === pane + ' > :first-child > nav'
   ))
+  const frame = onlyRule(rules, 'wide stage frame', (rule) => (
+    rule.context === '' && rule.selector === control.selector + ':after'
+  ))
+  const artBox = onlyRule(rules, 'shared art box', (rule) => (
+    rule.context === '' && rule.selector === '[data-dsh-surface="sidebar"] > :first-child'
+  ))
 
   it('presents the stage character area as the New Session hit plane', () => {
     // Given the control's containing-block role is released, the pseudo
@@ -156,13 +162,43 @@ describe('orca-link sidebar stage geometry', () => {
     expect(plane.declarations['cursor']).toBe('pointer')
     expect(plane.declarations['z-index']).toBe('2')
 
-    // And the corner marker rides the plane's bottom-right corner
-    const marker = onlyRule(rules, 'wide corner marker', (rule) => (
-      rule.context === '' && rule.selector === control.selector + ':after'
+    // And the plane paints nothing: it used to carry the corner brackets, which
+    // is why the visible frame had to share its clipped height and ended up
+    // framing the top half of the character. The frame is the other half.
+    expect(plane.declarations['background']).toBeUndefined()
+    expect(plane.declarations['box-shadow']).toBeUndefined()
+  })
+
+  it('frames the character area the art is painted in', () => {
+    // Given the pane declares the art box once, for the picture and the frame
+    expect(artBox.declarations['--orca-art-h']).toBe('calc(var(--orca-stage, 300px) - 66px)')
+    expect(character.declarations['height']).toBe('var(--orca-art-h)')
+
+    // Then the frame is exactly that box, edge for edge: the highlight is the
+    // picture's own rectangle, not a clipped band across its top
+    expect(frame.declarations['top']).toBe(character.declarations['top'])
+    expect(frame.declarations['left']).toBe(character.declarations['left'])
+    expect(frame.declarations['width']).toBe(character.declarations['width'])
+    expect(frame.declarations['height']).toBe(character.declarations['height'])
+
+    // And it stays decoration: the hit plane below is the only pointer target
+    expect(frame.declarations['pointer-events']).toBe('none')
+    expect(frame.declarations['position']).toBe('absolute')
+    expect(frame.declarations['opacity']).toBe('0')
+
+    // And the corner wedge, the one piece of the frame language that rests on
+    // screen, takes the art's own bottom-right corner instead of a separately
+    // positioned box that drifts off the picture
+    const wedge = onlyRule(rules, 'stage corner wedge', (rule) => (
+      rule.context === ''
+      && rule.selector === pane + ' > :first-child > .orca-ch-statusCharacter:before'
     ))
-    expect(marker.declarations['position']).toBe('absolute')
-    expect(marker.declarations['top']).toBe('calc(58px + var(--orca-stage, 300px) - 174px - 12px)')
-    expect(marker.declarations['left']).toBe('calc(22px + var(--orca-sidebar-art-width, 280px) - 30px - 13px)')
+    expect(wedge.declarations['background']).toBe('linear-gradient(to top left, var(--orca-blue) 0 50%, #0000 50%)')
+    expect(wedge.declarations['right']).toBe('4px')
+    expect(wedge.declarations['bottom']).toBe('3px')
+    expect(wedge.declarations['pointer-events']).toBe('none')
+    // And it is not also drawn by the frame, which would double the corner
+    expect(frame.declarations['background']).not.toContain('to top left')
   })
 
   it('stops the hit plane where the panel list begins', () => {
