@@ -333,17 +333,30 @@ describe('orca-link hooks: composer seat and settings overlay', () => {
     return { root, seat, card }
   }
 
-  function settingsFixture(): { slot: HTMLElement; dialog: HTMLElement } {
+  // dsh 0.2.0 ports the settings panel to <body>: SettingsPanel renders
+  // {overlay[role=presentation] > mask, dialog} through createPortal, so the
+  // dialog is a body child and NOT inside the sidebar.settings slot, which
+  // holds only the trigger row. The skin center marks the real dialog with
+  // [data-dsh-surface=settings] (semantic-adapter: a role=dialog containing
+  // the settings.section outlet), which is the anchor the skin watches.
+  function settingsFixture(): { slot: HTMLElement; overlay: HTMLElement; dialog: HTMLElement } {
     const slot = document.createElement('div')
     slot.setAttribute('data-slot', 'sidebar.settings')
-    const presentation = document.createElement('div')
-    presentation.setAttribute('role', 'presentation')
+    const overlay = document.createElement('div')
+    overlay.setAttribute('role', 'presentation')
+    const mask = document.createElement('div')
+    mask.className = 'mask'
     const dialog = document.createElement('div')
     dialog.setAttribute('role', 'dialog')
-    presentation.append(dialog)
-    slot.append(presentation)
-    document.body.append(slot)
-    return { slot, dialog }
+    dialog.setAttribute('data-shortcut-modal', 'settings')
+    // the skin center's semantic adapter marks the real dialog this way
+    dialog.setAttribute('data-dsh-surface', 'settings')
+    const section = document.createElement('div')
+    section.setAttribute('data-slot', 'settings.section')
+    dialog.append(section)
+    overlay.append(mask, dialog)
+    document.body.append(slot, overlay)
+    return { slot, overlay, dialog }
   }
 
   it('mounts composer drag handles without throwing on initial binding (#1200)', () => {
@@ -370,11 +383,15 @@ describe('orca-link hooks: composer seat and settings overlay', () => {
 
     expect(document.body.hasAttribute('data-orca-settings-open')).toBe(false)
 
-    const { slot } = settingsFixture()
+    // Given a settings dialog portalled beside the sidebar slot
+    const { overlay } = settingsFixture()
+    // When the observer synchronizes
     await flush()
+    // Then the open marker is set
     expect(document.body.hasAttribute('data-orca-settings-open')).toBe(true)
 
-    slot.remove()
+    // And when the dialog unmounts, the marker clears
+    overlay.remove()
     await flush()
     expect(document.body.hasAttribute('data-orca-settings-open')).toBe(false)
 

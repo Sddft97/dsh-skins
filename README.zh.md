@@ -1,6 +1,19 @@
-# 皮肤中心（GUI 内置皮肤中心）
+# dsh-skins · DeepSeek Harness (DSH) 皮肤中心与 Wallpaper Engine 动态主题工坊
 
 [English](README.md) | 中文
+
+<p align="center">
+  <img src="https://img.shields.io/npm/v/@linxin666/dsh-client-ui-skin-center?style=flat-square" alt="Version">
+  &nbsp;
+  <img src="https://img.shields.io/badge/DSH-%3E%3D0.2.0--rc.2-4c6ef5?style=flat-square&amp;labelColor=454a54" alt="DSH">
+  &nbsp;
+  <img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square" alt="License">
+</p>
+
+<p align="center">
+  <strong>DeepSeek Harness（DSH）官方 Web GUI 与桌面客户端专属主题与个性化美化引擎</strong><br>
+  <em>主题换肤 · Wallpaper Engine 动态壁纸 · 毛玻璃高斯模糊 · 自定义深浅色配色 · 创意工坊即时试穿</em>
+</p>
 
 `@linxin666/dsh-client-ui-skin-center`（cordis 插件 id `ui-skin-center`）是 dsh Web GUI 唯一的皮肤包：它把皮肤列表 / 试穿 / 应用做成一级设置分区「皮肤中心」（设置 → 皮肤中心，只列已安装皮肤），并且是所有皮肤的唯一加载器与渲染器。皮肤是纯资产目录——没有 package.json、不发 npm、不接 cordis 接线——只与皮肤中心契约（`contracts/`）耦合；皮肤中心把对官方 DSH 的全部耦合吸收在契约之后。卡片自带总开关（关闭即停用试穿、应用与背景控制）。
 
@@ -14,6 +27,17 @@
 - 背景控制：背景遮蔽滑杆（0–100%）为画背景的皮肤在面板后加纱，两个按状态的高斯模糊滑杆（0–20 px）分别控制空对话与有内容时的背景，输入卡模糊滑杆（0–20 px）只控制输入卡背后的磨砂区域，气泡不透明度滑杆（0–100%）控制支持气泡 alpha 的皮肤消息气泡。整张壁纸模糊仍是独立的壁纸设置。背景模糊通过外壳之后的固定 `backdrop-filter` 元素施加；0 完全关闭（无元素、无 GPU 开销）。输入卡磨砂由独立的 body 级固定跟随层（`data-dsh-composer-frost` 元素）承担并按输入卡尺寸跟随，**不**挂在卡片本体上：卡片一旦带 `backdrop-filter` 就会成为其中 shell fixed tooltip 的包含块，悬停时整页会话会被顶动。
 - Wallpaper Engine 桥：卡片可把本机 Wallpaper Engine 库用作 GUI 背景。host 半区（`src/we-library.ts` + `src/we-routes.ts`）定位 WE 安装（Steam 应用 431960：Windows 注册表、`libraryfolders.vdf` 中的全部库路径、持久的 `appmanifest_431960.acf` 所有权事实与探测路径），扫描项目与创意工坊内容及可选手动文件夹，经同源 `/api/skin-center/we/*` 路由提供清单、媒体（Range 流式）、预览图、web 壁纸项目文件（注入 WE API shim）与场景壁纸主贴图 PNG（由 `src/pkg-extract.ts` 进程内解码 PKG/TEX，磁盘缓存）。视频壁纸用 `<video>` 渲染，web 壁纸用沙箱 `<iframe>`，场景壁纸经内置 WebGL 播放器实时渲染（2D 图层场景与 3D 模型场景按 WE 材质/着色器语义回放）；场景内嵌脚本会被忽略，但受支持的图像、反射、水面与粒子通道仍保持实时渲染，「静态帧」模式可为任意类型钉一张零动画开销的图。单张壁纸的导入会把项目复制进 `<harness-home>/skin-center/wallpapers/`，脱离 Steam 库变更也能用，并检测创意工坊原作更新。壁纸都是用户本机文件，从不上传或再分发——创意工坊内容归原作者。「手动文件夹」行可接收零散 `.mp4`/`.webm` 媒体、单个项目、项目合集、Wallpaper Engine 安装根目录或 Steam 库根目录（`~` 展开为主目录）。
 - 旧版迁移：v2 升级后的首次启动，一次性桥（`src/legacy-bridge.ts`）读取 harness home 根 `cordis.patch.yml`（v1 CLI 写入处；活动 profile 的 `cordis.patch.yml` 作为次级位置也会探测）里已退役的 `dsh-skin` 受管段，把活动皮肤 id 迁进 v2 选择存储，并清除旧行。迁移幂等且 fail-closed（出错时旧状态原样保留）。仅在发生迁移、清理或失败时输出日志，无 legacy 状态的稳态保持静默（issue #788）。
+
+
+## 核心特性与场景
+
+| 核心使用场景 | 原生 DSH Web 局限 | 皮肤中心（dsh-skins）解决方案 |
+|---|---|---|
+| 个性化界面视觉与护眼暗色模式 | 仅支持单一官方默认黑白主题 | 内置经典 Blue Fantasy 蓝色幻想暗色主题，支持从创意工坊一键安装数十款精美主题 |
+| Wallpaper Engine 动态壁纸交互背景 | 无法使用动态壁纸或视频背景 | 深度桥接本机 Steam Wallpaper Engine，支持视频壁纸、Web 壁纸与 2D/3D WebGL 实时场景壁纸 |
+| 毛玻璃背景模糊与输入卡磨砂控制 | 界面背景单一，无视觉层次感 | 提供全局背景遮罩（0–100%）、空会话/有内容动态高斯模糊、输入框局部磨砂跟随与气泡透明度滑杆 |
+| 自定义品牌与个性配色重映射 | 无法自定义主题颜色与对比度 | 独立编辑浅色/深色强调色、背景色、前景色与对比度，自动生成审计级 CSS token 覆盖层 |
+| 主题资产即时试穿与无感热切换 | 更换主题需重启服务或刷新页面 | 原子切换引擎实现一键即时试穿、退出恢复与持久化应用，刷新直接以当前皮肤启动零白屏闪烁 |
 
 ## 人气皮肤
 

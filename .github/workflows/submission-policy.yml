@@ -1,0 +1,88 @@
+name: Submission policy
+
+# Refuses a submission before human review when
+#   1. the account is on the blocked list,
+#   2. the title or description announces a prohibited subject, or
+#   3. a skin pull request's evidence screenshots are not byte-identical to the
+#      files it commits under the evidence directory.
+# All three rules are data in .github/submission-policy.json.
+#
+# pull_request_target with the checkout pinned to the base commit, so the policy
+# file and these scripts always come from the base branch: a fork cannot edit
+# them, and the pull request's own code is never checked out or executed here.
+
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review, edited, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  submission-policy:
+    name: Refuse blocked accounts, prohibited subjects and unverifiable evidence
+    if: ${{ github.repository == 'zhu1090093659/dsh-skins' && !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the base branch policy
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+
+      - name: Account and subject policy
+        id: policy
+        env:
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          printf '%s' "$PR_BODY" > pr-body.md
+          : > close-reason.txt
+          run_check() {
+            set +e
+            node scripts/submission-policy.mjs "$@" > decision.txt 2>&1
+            code=$?
+            set -e
+            case "$code" in
+              0) return 0 ;;
+              3) cat decision.txt >> close-reason.txt; return 0 ;;
+              *) cat decision.txt >&2; return "$code" ;;
+            esac
+          }
+          run_check --login "$PR_AUTHOR"
+          run_check --text-file pr-body.md
+          if [ -s close-reason.txt ]; then
+            echo "close=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Evidence policy
+        id: evidence
+        if: steps.policy.outputs.close != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set +e
+          node scripts/verify-evidence.mjs --pr "$PR_NUMBER" --comment-file evidence-comment.txt
+          code=$?
+          set -e
+          case "$code" in
+            0) ;;
+            4) cp evidence-comment.txt close-reason.txt; echo "close=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "verify-evidence: exited $code" >&2; exit "$code" ;;
+          esac
+
+      - name: Close the submission
+        if: steps.policy.outputs.close == 'true' || steps.evidence.outputs.close == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          state=$(gh pr view "$PR_NUMBER" --json state --jq .state)
+          if [ "$state" != "OPEN" ]; then
+            echo "submission-policy: pull request is $state; nothing to close"
+            exit 0
+          fi
+          { cat close-reason.txt; echo; cat .github/submission-policy-notice.md; } > comment.md
+          gh pr comment "$PR_NUMBER" --body-file comment.md
+          gh pr close "$PR_NUMBER"

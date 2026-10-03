@@ -29,6 +29,39 @@ built into the market (`dsh-market.com`) and installed on demand into
 `$DSH_HOME/skins/<id>` by the Workshop. Adding a directory here is what makes a
 skin available to that pipeline.
 
+## Submission policy
+
+Two maintainer decisions sit in front of the intake gates. Both are recorded
+machine-readably in [.github/submission-policy.json](.github/submission-policy.json),
+which is the single source for them; run
+`node scripts/submission-policy.mjs --list` to read the current policy.
+
+- **Blocked contributors.** Pull requests from a listed account are closed
+  without review by `.github/workflows/submission-policy.yml`. The list is
+  maintained by the repository owner; a listed account asks the owner to
+  reconsider in an issue, not in a new pull request.
+- **Prohibited works and categories.** A submission that depicts a listed work,
+  or that belongs to a listed category (currently the DeepSeek male-persona skin
+  type), is refused at the copyright gate whatever account it comes from. An
+  entry may also declare keywords: a pull request whose title or description
+  announces one is closed without review. Each entry records the subject, the
+  date it was prohibited and the reason.
+- **Evidence that can be checked.** A skin pull request embeds its two
+  screenshots (light and dark) in the description and commits the same two files
+  under `evidence/`. CI downloads every image the description references and
+  requires a byte-identical (`sha256`) file among the `evidence/` files the pull
+  request commits; a missing image, a mismatch, or a link that cannot be
+  downloaded closes the pull request without review. Only a match hands the
+  submission to the gates - a screenshot that does not correspond to the
+  submitted source proves nothing about it.
+
+Copyright review is part of intake, not a formality. Every artwork asset a skin
+ships must declare its source (the manifest's `license`, `licenseUrl` or
+`attribution` field, or a `LICENSE` / `NOTICE` file in the skin directory),
+every depicted character must be named together with its work and its rights
+holder, and artwork whose provenance is not established is not merged. A
+prohibited work is refused even when the rest of the submission is complete.
+
 ## Commit and review
 
 Use Conventional Commits (`feat(skins): add <name>`, `fix(skin-center): ...`).
