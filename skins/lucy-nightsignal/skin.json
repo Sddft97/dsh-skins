@@ -22,7 +22,7 @@
   "licenseUrl": "https://github.com/lemonhall/dsh-skin-lucy/blob/main/LICENSE",
   "noticeUrl": "https://github.com/lemonhall/dsh-skin-lucy/blob/main/NOTICE",
   "sourceUrl": "https://github.com/lemonhall/dsh-skin-lucy",
-  "attribution": "AI 生成素材（OFOX · Seedream 5.0 Pro 立绘 + GPT Image 2.5 Sunburst 场景）· 非官方同人再创作",
+  "attribution": "AI 生成素材：OFOX 图像 API（volcengine/doubao-seedream-5.0-pro）生成，立绘在本地做色度键抠图；角色与作品权利归原权利人；非官方同人作品，仅供个人非商业使用。",
   "preview": {
     "light": "preview/light.jpg",
     "dark": "preview/dark.jpg"
