@@ -70,12 +70,17 @@ export interface SkinControllerDeps {
   /** hooks.mjs dynamic import seam for tests. */
   importHooks?: (url: string) => Promise<unknown>
   /**
-   * Background-media priority (issue #506): when this returns true the
-   * skin's manifest backgroundMedia is NOT painted — the Wallpaper Engine
-   * wallpaper (and the user's manual background) outrank it. Re-evaluated
-   * on every activation and on refresh().
+   * External stand-down (issue #39): when this returns true another plugin
+   * owns the whole visual — the delegated `dsh-plugin-wallpaper-engine` is
+   * rendering a wallpaper — and a skin must not be painted at all, because
+   * that plugin rewrites the same shell and paints its own glass.
+   *
+   * The user's chosen skin is still remembered (and still persisted when they
+   * apply one), so it returns untouched the moment the wallpaper stops; only
+   * the painting is withheld. Re-evaluated on every activation and on
+   * refresh().
    */
-  suppressBackgroundMedia?: () => boolean
+  suppressSkin?: () => boolean
   /** Diagnostics sink (switch failures, hook errors). */
   onError?: (message: string, error: unknown) => void
 }
@@ -83,6 +88,12 @@ export interface SkinControllerDeps {
 export interface SkinControllerState {
   /** The currently applied skin (null = stock look). */
   active: string | null
+  /**
+   * True while a skin is selected but withheld because another plugin owns the
+   * visual (see {@link SkinControllerDeps.suppressSkin}). The selection is
+   * intact and repaints as soon as that plugin stops.
+   */
+  stoodDown: boolean
   /** The previewed skin id (null = the stock look is being previewed). */
   trying: string | null
   /** Whether a try-on preview is live (distinguishes previewing the stock
@@ -155,9 +166,10 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
    */
   function repaintBackgroundForTheme(): void {
     if (active === null || currentActivation === null || lastEntry === null) return
+    // A withheld skin has no paint to repaint (issue #39).
+    if (stoodDown) return
     const media = lastEntry.manifest.contributes.backgroundMedia
     if (!media) return
-    if (deps.suppressBackgroundMedia?.() === true) return
     const variant = themeGet() === 'dark' ? (media.dark ?? media.light) : (media.light ?? media.dark)
     if (!variant) return
     const assetBase = `${apiBase}/skins/${lastEntry.manifest.id}`
@@ -182,17 +194,18 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
   let committed: { id: string | null; entry: ControllerSkinEntry | null } = { id: initialSkinId, entry: null }
   /** Last non-null applied entry, so refresh() can re-activate it. */
   let lastEntry: ControllerSkinEntry | null = null
-  /** Last evaluated background-suppression verdict (refresh() skips no-ops). */
-  let lastSuppressed: boolean | null = deps.suppressBackgroundMedia?.() === true
+  /** Last evaluated stand-down verdict (refresh() skips no-ops). */
+  let lastSuppressed: boolean | null = deps.suppressSkin?.() === true
   let trying: string | null = null
   let previewing = false
   const listeners = new Set<() => void>()
   // React's useSyncExternalStore requires a CACHED snapshot: getSnapshot must
   // return the same reference until the state actually changes, or the store
   // consumer loops forever (and the settings card crashes blank).
-  let stateSnapshot: SkinControllerState = { active: initialSkinId, trying: null, previewing: false }
+  let stoodDown = lastSuppressed === true
+  let stateSnapshot: SkinControllerState = { active: initialSkinId, stoodDown, trying: null, previewing: false }
   const emit = (): void => {
-    stateSnapshot = { active, trying, previewing }
+    stateSnapshot = { active, stoodDown, trying, previewing }
     for (const listener of listeners) listener()
   }
 
@@ -264,11 +277,9 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
       setBackgroundLayer(activation, [])
       return
     }
-    // WE wallpaper > user manual background > skin manifest background.
-    if (deps.suppressBackgroundMedia?.() === true) {
-      setBackgroundLayer(activation, [])
-      return
-    }
+    // An external owner (the delegated wallpaper plugin) withholds the whole
+    // skin, background media included, before this is reached (see
+    // switchInternal); nothing to arbitrate here.
     const variant = themeGet() === 'dark' ? (media.dark ?? media.light) : (media.light ?? media.dark)
     if (!variant) {
       setBackgroundLayer(activation, [])
@@ -342,8 +353,13 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
   ): Promise<string | null> {
     const seq = ++latestRequest
     const activation = ledger.beginActivation()
+    // External stand-down (issue #39): another plugin owns the visual, so this
+    // activation is recorded and persisted but nothing is painted. `active`
+    // still names the user's choice, which is what the card shows and what
+    // repaints the moment that plugin stops.
+    const withheld = deps.suppressSkin?.() === true
     try {
-      if (id !== null && entry !== null) {
+      if (!withheld && id !== null && entry !== null) {
         const stylesheetHref = `${apiBase}/skins/${id}/stylesheet`
         const patchesHref = entry.manifest.contributes.patches !== undefined
           ? `${apiBase}/skins/${id}/patches`
@@ -358,19 +374,25 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
         installBackground(activation, entry)
         await installHooks(activation, entry)
       } else {
-        // Stock / entryless switch owns the background layer too: it must
-        // clear a previous skin's paint (the old activation's restore is
+        // Stock / entryless / withheld switch owns the background layer too: it
+        // must clear a previous skin's paint (the old activation's restore is
         // skipped as stale by the ownership gate).
         setBackgroundLayer(activation, [])
       }
       if (seq !== latestRequest) throw new StaleSwitch()
 
-      // The atomic cut: attribute first, then retire the old activation.
-      if (id === null) doc.documentElement.removeAttribute('data-dsh-skin')
+      // The atomic cut: attribute first, then retire the old activation. A
+      // withheld skin leaves the stamp off, which is what actually removes the
+      // skin's CSS from the page.
+      if (id === null || withheld) doc.documentElement.removeAttribute('data-dsh-skin')
       else doc.documentElement.setAttribute('data-dsh-skin', id)
       const previous = currentActivation
       currentActivation = activation
       active = id
+      stoodDown = withheld
+      // This activation already applied the current verdict, so refresh() must
+      // not read it as a change and re-switch on the next call.
+      lastSuppressed = withheld
       if (entry !== null) lastEntry = entry
       if (shouldPersist) {
         committed = { id, entry }
@@ -391,6 +413,7 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
       if (error instanceof StaleSwitch) return active
       if (currentActivation === null) {
         active = null
+        stoodDown = false
         committed = { id: null, entry: null }
         doc.documentElement.removeAttribute('data-dsh-skin')
         emit()
@@ -431,14 +454,14 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
     },
 
     async refresh() {
-      const suppressed = deps.suppressBackgroundMedia?.() === true
+      const suppressed = deps.suppressSkin?.() === true
       if (suppressed === lastSuppressed) return active
       lastSuppressed = suppressed
-      const id = active
-      if (id !== null && lastEntry === null) {
-        return active
-      }
-      return await switchInternal(id, id === null ? null : lastEntry, false)
+      if (active !== null && lastEntry === null) return active
+      // Re-apply the SAME logical selection: switchInternal decides whether it
+      // paints or withholds, so a wallpaper starting or stopping flips the page
+      // without touching what the user chose.
+      return await switchInternal(active, active === null ? null : lastEntry, false)
     },
 
     shutdown() {
@@ -449,6 +472,7 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
         currentActivation = null
       }
       active = null
+      stoodDown = false
       trying = null
       previewing = false
       committed = { id: null, entry: null }

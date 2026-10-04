@@ -81,8 +81,44 @@ const ACTIVE_CONVERSATION_CONTENT_SELECTOR = [
   '[data-conversation-scroll] [class*="_turnErrorRow"]',
 ].join(', ')
 
-/** One source that can make backdrop art visible. */
+/**
+ * One source that can make backdrop art visible.
+ *
+ * Only `skin` reports through this module now: the wallpaper source belongs
+ * to the delegated `dsh-plugin-wallpaper-engine`, which paints its own glass
+ * and its own backdrop. Its presence is reported through
+ * {@link setComposerFrostSuppressed} instead of the marker, because the skin
+ * center must not claim the wallpaper's scene.
+ */
 export type BackdropSource = 'skin' | 'wallpaper'
+
+/**
+ * Documents whose composer frost is suppressed by an external owner.
+ *
+ * The delegated wallpaper plugin paints a fixed frosted composer of its own,
+ * and two fixed `backdrop-filter` stacks sample a shell the other one relaid,
+ * so the skin center must not add a second one. A plain flag (rather than the
+ * backdrop marker) keeps the two concerns apart: suppressing the frost must
+ * not retract the skin's own backdrop marker or the seat neutralizer, which
+ * the skin still needs.
+ */
+const frostSuppressed = new WeakSet<Document>()
+
+/**
+ * Suppress (or restore) the composer frost follower for one document.
+ *
+ * Called by the external-plugin interop watcher while
+ * `body[data-we-wallpaper]` is present. Idempotent, and it re-evaluates the
+ * follower immediately, so the suppression applies even when the backdrop and
+ * conversation markers are unchanged.
+ * @param doc - the document whose frost is gated.
+ * @param suppressed - true while an external owner paints the composer glass.
+ */
+export function setComposerFrostSuppressed(doc: Document, suppressed: boolean): void {
+  if (suppressed) frostSuppressed.add(doc)
+  else frostSuppressed.delete(doc)
+  syncComposerFrost(doc)
+}
 
 /** Compatibility default for the input-card backdrop blur strength (px). */
 export const INPUT_FROST_BLUR_PX = 10
@@ -364,7 +400,7 @@ function stopFrostFollower(doc: Document): void {
 export function syncComposerFrost(doc: Document): void {
   const wanted = doc.body !== null && doc.body.hasAttribute(BACKDROP_ACTIVE_ATTR)
     && doc.body.hasAttribute(CONVERSATION_CONTENT_ATTR)
-  if (!wanted) {
+  if (!wanted || frostSuppressed.has(doc)) {
     stopFrostFollower(doc)
     return
   }

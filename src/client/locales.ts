@@ -8,10 +8,13 @@
 export type SkinCenterKey =
   | 'title'
   | 'cardDescription'
-  | 'coexistenceTitle'
-  | 'coexistenceBody'
-  | 'coexistenceSwitch'
-  | 'coexistenceLink'
+  | 'externalWallpaperReadyTitle'
+  | 'externalWallpaperReadyBody'
+  | 'externalWallpaperMissingTitle'
+  | 'externalWallpaperMissingBody'
+  | 'externalWallpaperLink'
+  | 'stoodDownTitle'
+  | 'stoodDownBody'
   | 'enabled'
   | 'enabledHint'
   | 'offNote'
@@ -138,10 +141,13 @@ export type SkinCenterKey =
 export const en: Record<SkinCenterKey, string> = {
   title: 'Skin Center',
   cardDescription: 'Try on any installed skin live in the GUI — exit restores instantly, applying persists in one click.',
-  coexistenceTitle: 'Another wallpaper plugin is installed',
-  coexistenceBody: 'This profile also carries "{package}", which paints its own wallpaper layer, rewrites the shell and drives the theme. The two are alternatives: run one of them, or the backdrop layers overlay each other and both frosted-glass passes go wrong.',
-  coexistenceSwitch: 'Pick one with the plugin manager, then restart dsh: keep this card\'s built-in Wallpaper Engine bridge, or turn the bridge off and keep the standalone plugin. See this README for the exact steps.',
-  coexistenceLink: 'Open the standalone plugin\'s documentation',
+  externalWallpaperReadyTitle: 'Wallpapers are handled by another plugin',
+  externalWallpaperReadyBody: 'Wallpaper Engine support comes from the {package} plugin, which owns the wallpaper library, rendering and settings. While it renders a wallpaper it takes over the backdrop, and this card keeps the skin on top of it: the skin\'s own background art steps aside and the composer frost yields to the plugin\'s glass.',
+  externalWallpaperMissingTitle: 'Wallpaper Engine support moved to its own plugin',
+  externalWallpaperMissingBody: 'This card no longer bundles a Wallpaper Engine bridge. To use Wallpaper Engine wallpapers, install {package} with the command below and restart dsh; it adds its own settings page for the wallpaper library, rendering and glass.',
+  externalWallpaperLink: 'Open the wallpaper plugin docs',
+  stoodDownTitle: 'Skin paused while the wallpaper is active',
+  stoodDownBody: 'Your skin is still selected, but it is not painted while the wallpaper plugin renders a wallpaper: the two cannot share the backdrop. Stop the wallpaper there and the skin comes back on its own.',
   enabled: 'Enable skin center',
   enabledHint: 'When off, try-on, apply and background controls are disabled; turn it back on to resume.',
   offNote: 'The skin center is turned off.',
@@ -269,10 +275,13 @@ export const en: Record<SkinCenterKey, string> = {
 export const zh: Record<SkinCenterKey, string> = {
   title: '皮肤',
   cardDescription: '在 GUI 内即时试穿任意皮肤，退出即完全还原；应用一键完成并自动刷新。',
-  coexistenceTitle: '检测到另一个壁纸插件',
-  coexistenceBody: '当前 profile 同时装有「{package}」，它会画自己的壁纸层、改写壳层并驱动主题。两者是二选一：同时启用时两层背景互相覆盖，两套毛玻璃也会互相破坏。',
-  coexistenceSwitch: '请用插件管理器二选一，然后重启 dsh：保留本卡片自带的 Wallpaper Engine 桥，或关闭该桥、改用独立插件。具体步骤见本仓库 README。',
-  coexistenceLink: '打开独立插件的文档',
+  externalWallpaperReadyTitle: '壁纸已由独立插件接管',
+  externalWallpaperReadyBody: 'Wallpaper Engine 壁纸来自 {package} 插件，壁纸库、渲染与设置都归它管。它渲染壁纸时会接管背景，本卡片让皮肤叠在其之上：皮肤自身的背景图让路，输入卡磨砂也让给该插件的玻璃。',
+  externalWallpaperMissingTitle: 'Wallpaper Engine 支持已独立成插件',
+  externalWallpaperMissingBody: '本卡片不再自带 Wallpaper Engine 桥。要使用 Wallpaper Engine 壁纸，请用下面的命令安装 {package} 并重启 dsh；它自带壁纸库、渲染与玻璃的设置页。',
+  externalWallpaperLink: '打开壁纸插件文档',
+  stoodDownTitle: '壁纸启用期间皮肤已暂停',
+  stoodDownBody: '你选择的皮肤仍然保留，但在壁纸插件渲染壁纸期间不会绘制：两者的背景无法共存。在该插件里停止壁纸，皮肤会自动恢复。',
   enabled: '启用皮肤中心',
   enabledHint: '关闭后停用试穿、应用与背景控件，重新打开即恢复。',
   offNote: '皮肤中心已关闭。',

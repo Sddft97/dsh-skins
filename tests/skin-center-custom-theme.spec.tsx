@@ -272,25 +272,40 @@ describe('SkinCenter custom theme transactions', () => {
     expect(host.textContent).toContain(t('applyFailed'))
   })
 
-  it('clears the persisted wallpaper when restoring the official default look (#920)', async () => {
+  // The card used to clear the wallpaper selection whenever a skin was
+  // applied or the official look was restored (#920). That coupling is gone
+  // with the built-in bridge (issue #39): the wallpaper belongs to
+  // `dsh-plugin-wallpaper-engine`, which the skin center must not write. The
+  // four cases below pin that the card leaves the wallpaper alone in every
+  // path — apply, restore, try-on and a failed switch.
+
+  it('leaves the wallpaper selection alone when restoring the official look', async () => {
+    // Given an active skin with a wallpaper rendering behind it
     const clearSelection = vi.fn()
     await renderSkinCenter({ active: 'mint', wallpaperSelection: '1218076433', clearSelection })
 
+    // When the official default look is restored
     await click(buttonNamed(cardNamed('官方默认'), t('restore')))
 
-    expect(clearSelection).toHaveBeenCalledTimes(1)
+    // Then the skin is gone but the wallpaper is untouched: it belongs to the
+    // delegated plugin, which never asked the skin center to manage it
+    expect(clearSelection).not.toHaveBeenCalled()
   })
 
-  it('clears the persisted wallpaper after an installed skin activates', async () => {
+  it('leaves the wallpaper selection alone after an installed skin activates', async () => {
+    // Given a wallpaper rendering behind an unstyled GUI
     const clearSelection = vi.fn()
     await renderSkinCenter({ wallpaperSelection: 'macos-aerial', clearSelection })
 
+    // When a skin is applied
     await click(buttonNamed(cardNamed('Mint'), t('apply')))
 
-    expect(clearSelection).toHaveBeenCalledTimes(1)
+    // Then the wallpaper survives the skin switch
+    expect(clearSelection).not.toHaveBeenCalled()
   })
 
-  it('keeps the persisted wallpaper when an installed skin fails to activate', async () => {
+  it('leaves the wallpaper selection alone when an installed skin fails to activate', async () => {
+    // Given a switch that will not settle
     const clearSelection = vi.fn()
     await renderSkinCenter({
       wallpaperSelection: 'macos-aerial',
@@ -298,18 +313,23 @@ describe('SkinCenter custom theme transactions', () => {
       switchTo: async () => null,
     })
 
+    // When the apply fails
     await click(buttonNamed(cardNamed('Mint'), t('apply')))
 
+    // Then the failure is surfaced and the wallpaper is still untouched
     expect(clearSelection).not.toHaveBeenCalled()
     expect(host.textContent).toContain(t('applyFailed'))
   })
 
-  it('keeps the persisted wallpaper while trying on an installed skin', async () => {
+  it('leaves the wallpaper selection alone while trying on an installed skin', async () => {
+    // Given a wallpaper rendering behind an unstyled GUI
     const clearSelection = vi.fn()
     await renderSkinCenter({ wallpaperSelection: 'macos-aerial', clearSelection })
 
+    // When the skin is only tried on
     await click(buttonNamed(cardNamed('Mint'), t('tryOn')))
 
+    // Then the wallpaper is untouched
     expect(clearSelection).not.toHaveBeenCalled()
   })
 

@@ -2,6 +2,14 @@
 
 Status: implemented
 
+**Superseded by
+[2026-10-05-wallpaper-engine-delegated-to-its-own-plugin.md](../architecture/2026-10-05-wallpaper-engine-delegated-to-its-own-plugin.md).**
+The probe-and-advise half recorded here survives (renamed and repurposed as the
+install pointer), but the decision this note owns — "detected, never displaced" —
+no longer holds: the skin center removed its own Wallpaper Engine bridge and now
+yields the page to that plugin while it renders. Read the superseding note for
+current behavior; this one is kept as the record of the advisory round.
+
 ## Problem
 
 `dsh-plugin-wallpaper-engine` renders the machine's Wallpaper Engine library onto

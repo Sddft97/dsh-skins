@@ -36,15 +36,22 @@
 ### 背景自有标记（owner: skin-center）
 
 皮肤中心「有背景艺术可见」期间的自有标记；均为 body/html 级属性（按上文纪律
-另行管理），`data-dsh-wallpaper-surface` 打在元素上：
+另行管理）：
 
 | 属性 | 位置 | 含义 / 锚定方式 |
 | --- | --- | --- |
-| `data-dsh-backdrop-active` | html + body（body/html 级，另行管理） | 皮肤背景媒体（`backgroundMedia`）或 WE 壁纸任一挂载期间置 `true`（`backdrop-scene.ts` 汇总双侧来源），卸载 / 禁用清净；供 composer seat 遮罩统一中和与输入区前置磨砂面板规则锚定，皮肤与壁纸场景行为一致（#777） |
+| `data-dsh-backdrop-active` | html + body（body/html 级，另行管理） | 皮肤背景媒体（`backgroundMedia`）挂载期间置 `true`（`backdrop-scene.ts`），卸载 / 禁用清净；供 composer seat 遮罩统一中和与输入区前置磨砂面板规则锚定（#777） |
 | `data-dsh-conversation-content` | html + body（body/html 级，另行管理） | 当前对话存在消息行（`[data-chat-anchor-key]`）期间置 `true`；`backdrop-scene.ts` 在背景可见时随 MutationObserver 更新。输入卡磨砂仅在 backdrop-active 且本标记置位时启用，空对话不显示多余模糊（#777 follow-up） |
-| `data-dsh-wallpaper-active` | html + body（body/html 级，另行管理） | WE 壁纸挂载期间置 `true`，卸载 / 禁用清除；供皮肤 CSS 与壁纸中和规则锚定（#734） |
-| `data-dsh-composer-frost` | body 级空元素（元素级，owner: skin-center） | 皮肤中心在 backdrop-active 且 conversation-content 置位期间挂载的输入卡磨砂层：body 级 fixed 兄弟元素，按输入卡 border box 跟随（rAF 合并测量），仅承载 `backdrop-filter`；标记清除即移除。磨砂**不能**挂在输入卡上——非 none 的 `backdrop-filter` 会让卡片成为其 fixed 后代的包含块，把官方 tooltip 推进会话滚动口并撑高 `scrollHeight`（#1724） |
-| `data-dsh-wallpaper-surface` | 官方 shell 全视口背景元素 + 侧栏工作区淡化条（元素级） | `WallpaperController.markWallpaperSurfaces()` 在 WE 壁纸挂载期间打标（全视口 bg-base 背景 + `data-slot="sidebar.workspaces"` 内渐变淡化条），命中 `html[data-dsh-wallpaper-active] [data-dsh-wallpaper-surface]` 中和；卸载清除，不含哈希类依赖（#734） |
+| `data-dsh-composer-frost` | body 级空元素（元素级，owner: skin-center） | 皮肤中心在 backdrop-active 且 conversation-content 置位期间挂载的输入卡磨砂层：body 级 fixed 兄弟元素，按输入卡 border box 跟随（rAF 合并测量），仅承载 `backdrop-filter`；标记清除即移除。磨砂**不能**挂在输入卡上——非 none 的 `backdrop-filter` 会让卡片成为其 fixed 后代的包含块，把官方 tooltip 推进会话滚动口并撑高 `scrollHeight`（#1724）。壁纸插件渲染期间本层不挂载（见下） |
+
+### 外部壁纸标记（owner: dsh-plugin-wallpaper-engine，只读消费）
+
+壁纸由独立插件 `dsh-plugin-wallpaper-engine` 提供，皮肤中心不再自带 WE 桥
+（#39）。该插件在渲染壁纸期间给 `body` 打上自有属性，皮肤中心只读它、从不写：
+
+| 属性 | 位置 | 含义 / 锚定方式 |
+| --- | --- | --- |
+| `data-we-wallpaper` | body（元素级，owner: 外部壁纸插件） | 外部插件渲染壁纸期间置位，停止时移除。皮肤中心在置位期间**整体停画皮肤**（不加载皮肤 CSS、不画 `backgroundMedia`、不跑 hooks、不挂 composer 磨砂，并把 `html[data-dsh-skin]` 属性撤下），用户选择保留，属性清除即自动恢复；皮肤目录内的让路规则（`body[data-we-wallpaper]::after` 等）也锚定它。等价属主与写者只有外部插件一方 |
 
 ## part 组（81 行，含各 owner 行）
 

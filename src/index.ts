@@ -20,9 +20,6 @@ import { migrateBackgroundFromSettings } from './background-migration.ts'
 import { migrateLegacySelection } from './legacy-bridge.ts'
 import { SKIN_BACKGROUND_DEFAULTS, type SkinBackgroundConfig } from './core/background.ts'
 import { findSkin, loadSkinCatalog } from './skin-repo.ts'
-import { makeWeRoutes } from './we-routes.ts'
-import { defaultWallpapersStoreDir } from './we-library.ts'
-import { resolveHarnessHome } from './harness-home.ts'
 import { mountOnce } from './mount-once.ts'
 import {
   CUSTOM_THEME_DEFAULTS,
@@ -32,7 +29,6 @@ import {
 } from './core/custom-theme.ts'
 
 export { makeSkinCenterV2Routes, SKIN_CENTER_V2_PREFIX } from './routes-v2.ts'
-export { makeWeRoutes, WE_API_PREFIX } from './we-routes.ts'
 // The contract surface, re-exported for tooling (the dsh-skin CLI validates
 // and installs skin directories through these; never duplicate the logic).
 export { validateSkinManifestV2 } from './core/manifest-v2/validate.ts'
@@ -107,79 +103,6 @@ export const SkinBackgroundConfigSchema = z.object({
 })
 
 /**
- * Configuration section for the Wallpaper Engine bridge. The browser half
- * renders the applied wallpaper behind the GUI and persists the selection
- * here; the host half reads weLibraryDirs to extend the library scan beyond
- * the auto-detected Steam folders.
- */
-export const SKIN_WALLPAPER_NAMESPACE = 'skin-wallpaper'
-
-/**
- * Whether the wallpaper feature starts enabled on a platform.
- *
- * Wallpaper Engine is a Windows application, so only Windows (and the Linux
- * Steam builds) have a library to auto-detect. macOS has none: the feature
- * therefore starts OFF there, and turning it on is the user pointing the
- * panel's directory picker at a folder of video wallpapers — which is the
- * whole macOS flow. Detection stays injectable so the default is testable on
- * any CI machine.
- *
- * @param platform - platform to decide for; defaults to the running host.
- * @returns true when the feature should start enabled.
- */
-export function defaultWallpaperEnabled(platform: NodeJS.Platform = process.platform): boolean {
-  return platform !== 'darwin'
-}
-
-/**
- * Wallpaper bridge configuration. Wallpapers only ever come from the user's
- * own machine (their Wallpaper Engine library or manual folders); the import
- * store keeps personal local copies, nothing is redistributed.
- */
-export interface SkinWallpaperConfig {
-  /** Master switch for the wallpaper feature. */
-  enabled?: boolean
-  /** Manual library folders (each a folder of projects or a single project). */
-  weLibraryDirs?: string[]
-  /** The applied wallpaper id ('' = none). */
-  selection?: string
-  /** Render mode: 'live' renders video/web, 'frame' pins a static frame. */
-  mode?: 'live' | 'frame'
-  /** Pause the video when the window is hidden (saves GPU/battery). */
-  pauseOnHidden?: boolean
-  /** Darkening scrim over the wallpaper, 0-90 percent. */
-  dim?: number
-  /** Blur radius applied to the wallpaper itself, 0-60 px. */
-  wallpaperBlur?: number
-  /** Opacity of the wallpaper media layer itself, 0-100 percent. */
-  wallpaperOpacity?: number
-  /** Sizing mode for live wallpapers: cover | contain | fill (stretch). */
-  fit?: 'cover' | 'contain' | 'fill'
-  /** Audible playback for sound-capable wallpapers. */
-  sound?: boolean
-  /** Playback volume, 0-100 percent. */
-  volume?: number
-}
-
-/** Runtime schema for SkinWallpaperConfig; every field is volatile (card-writable). */
-export const SkinWallpaperConfigSchema = z.object({
-  enabled: z.boolean().default(defaultWallpaperEnabled()).volatile(),
-  weLibraryDirs: z.array(z.string()).default([]).volatile(),
-  selection: z.string().default('').volatile(),
-  mode: z.union(['live', 'frame'] as const).default('live').volatile(),
-  pauseOnHidden: z.boolean().default(true).volatile(),
-  dim: z.number().min(0).max(90).step(5).default(25).volatile(),
-  wallpaperBlur: z.number().min(0).max(60).step(1).default(0).volatile(),
-  wallpaperOpacity: z.number().min(0).max(100).step(5).default(100).volatile(),
-  fit: z.union(['cover', 'contain', 'fill'] as const).default('cover').volatile(),
-  // The card's sound toggle and volume always persisted through this
-  // namespace's user layer; the section declares them so the Host accepts
-  // those writes instead of refusing the whole settings mutation.
-  sound: z.boolean().default(false).volatile(),
-  volume: z.number().min(0).max(100).step(5).default(100).volatile(),
-})
-
-/**
  * One config field as the Host hands it to the plugin: a `volatile()` field
  * resolves to a stable reference the loader re-points in place when a
  * settings write is committed, while a caller that resolved the schema itself
@@ -206,32 +129,16 @@ export interface SkinCustomThemeFields {
   dark?: ConfigField<CustomThemeConfig['dark']>
 }
 
-/** Runtime face of the skin-wallpaper section. */
-export interface SkinWallpaperFields {
-  enabled?: ConfigField<boolean>
-  weLibraryDirs?: ConfigField<string[]>
-  selection?: ConfigField<string>
-  mode?: ConfigField<'live' | 'frame'>
-  pauseOnHidden?: ConfigField<boolean>
-  dim?: ConfigField<number>
-  wallpaperBlur?: ConfigField<number>
-  wallpaperOpacity?: ConfigField<number>
-  fit?: ConfigField<'cover' | 'contain' | 'fill'>
-  sound?: ConfigField<boolean>
-  volume?: ConfigField<number>
-}
-
 /** The Host-resolved configuration this plugin's activation receives. */
 export interface SkinCenterConfig {
   'skin-background'?: SkinBackgroundFields
   'skin-custom-theme'?: SkinCustomThemeFields
-  'skin-wallpaper'?: SkinWallpaperFields
 }
 
 /**
  * Editable configuration of the skin center: what 0.1.7 serves as this
  * profile entry's settings page (the Host derives the page from this schema
- * and there is no separate settings document). The three sections are the
+ * and there is no separate settings document). The two sections are the
  * preference families the browser half owns — the same names this package
  * registered as settings namespaces before 0.1.7, now sections of one Config.
  *
@@ -245,7 +152,6 @@ export interface SkinCenterConfig {
 export const Config = z.object({
   'skin-background': SkinBackgroundConfigSchema,
   'skin-custom-theme': SkinCustomThemeConfigSchema,
-  'skin-wallpaper': SkinWallpaperConfigSchema,
 })
 
 /**
@@ -318,15 +224,7 @@ function applyImpl(ctx: Context, config?: SkinCenterConfig): void {
     console.error('[ui-skin-center] background migration failed:', error)
   }
 
-  const routes = [
-    ...makeSkinCenterV2Routes(),
-    ...makeWeRoutes({
-      // The /we routes read the live section per request, so a settings write
-      // reaches the library scan without a restart.
-      getConfig: () => ({ weLibraryDirs: readField(config?.['skin-wallpaper']?.weLibraryDirs, []) }),
-      storeDir: defaultWallpapersStoreDir(resolveHarnessHome()),
-    }),
-  ]
+  const routes = [...makeSkinCenterV2Routes()]
   try {
     ctx.effect(() => {
       const disposers: Array<() => void> = []

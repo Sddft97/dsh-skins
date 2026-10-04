@@ -748,52 +748,73 @@ describe('v2 single skin repair route', () => {
   })
 })
 
-describe('v2 coexistence probe route (issue #39)', () => {
-  it('serves the standalone-plugin report the card renders', async () => {
-    // Given a host whose profile also carries the standalone wallpaper plugin
+describe('v2 external wallpaper plugin route (issue #39)', () => {
+  it('serves the install pointer the card renders when the plugin is missing', async () => {
+    // Given a profile that does not carry the delegated wallpaper plugin
     const server = await serve(makeSkinCenterV2Routes({
       loadCatalog: () => loadSkinCatalog({ builtinDir: builtin, userDir: join(root, 'user') }),
       activeStatePath: statePath,
-      detectCoexistence: () => ({
-        detected: true,
-        signals: ['cordis-row'],
+      detectExternalWallpaper: () => ({
+        installed: false,
+        signals: [],
         packageName: 'dsh-plugin-wallpaper-engine',
         repository: 'https://github.com/elysia395/dsh-wallpaper-engine',
+        installCommand: 'dsh plugin --profile web add dsh-plugin-wallpaper-engine',
       }),
     }))
 
-    // When the card asks for the coexistence state
-    const res = await call(server.port, 'GET', `${SKIN_CENTER_V2_PREFIX}/coexistence`)
+    // When the card asks for the plugin state
+    const res = await call(server.port, 'GET', `${SKIN_CENTER_V2_PREFIX}/external-wallpaper`)
 
-    // Then the advisory input arrives under the family envelope
+    // Then the pointer input arrives under the family envelope, command included
     expect(res.status).toBe(200)
     expect(res.jsonBody.ok).toBe(true)
-    expect(res.jsonBody.detected).toBe(true)
+    expect(res.jsonBody.installed).toBe(false)
     expect(res.jsonBody.packageName).toBe('dsh-plugin-wallpaper-engine')
+    expect(res.jsonBody.installCommand).toContain('dsh plugin --profile web add')
     expect(res.jsonBody.repository).toContain('elysia395/dsh-wallpaper-engine')
     await server.close()
   })
 
-  it('answers not detected without failing when the profile is clean', async () => {
-    // Given a profile with no standalone plugin signal
+  it('reports an installed plugin without failing', async () => {
+    // Given a profile that already carries the plugin
     const server = await serve(makeSkinCenterV2Routes({
       loadCatalog: () => loadSkinCatalog({ builtinDir: builtin, userDir: join(root, 'user') }),
       activeStatePath: statePath,
-      detectCoexistence: () => ({
-        detected: false,
-        signals: [],
+      detectExternalWallpaper: () => ({
+        installed: true,
+        signals: ['cordis-row'],
         packageName: 'dsh-plugin-wallpaper-engine',
         repository: 'https://github.com/elysia395/dsh-wallpaper-engine',
+        installCommand: 'dsh plugin --profile web add dsh-plugin-wallpaper-engine',
       }),
     }))
 
-    // When the card asks for the coexistence state
-    const res = await call(server.port, 'GET', `${SKIN_CENTER_V2_PREFIX}/coexistence`)
+    // When the card asks for the plugin state
+    const res = await call(server.port, 'GET', `${SKIN_CENTER_V2_PREFIX}/external-wallpaper`)
 
-    // Then a clean profile is a 200 with no notice to render, not an error
+    // Then presence is a 200 the card turns into the "handled elsewhere" copy
     expect(res.status).toBe(200)
-    expect(res.jsonBody.detected).toBe(false)
-    expect(res.jsonBody.signals).toEqual([])
+    expect(res.jsonBody.installed).toBe(true)
+    expect(res.jsonBody.signals).toEqual(['cordis-row'])
+    await server.close()
+  })
+
+  it('serves no /we route any more: the built-in bridge is gone (issue #39)', async () => {
+    // Given the route family after the bridge removal
+    const server = await serve(makeSkinCenterV2Routes({
+      loadCatalog: () => loadSkinCatalog({ builtinDir: builtin, userDir: join(root, 'user') }),
+      activeStatePath: statePath,
+    }))
+
+    // When the retired wallpaper endpoints are requested
+    const inventory = await call(server.port, 'GET', '/api/skin-center/we/inventory')
+    const media = await call(server.port, 'GET', '/api/skin-center/we/media/abc')
+
+    // Then nothing serves them, so a stale bookmark cannot reach a removed
+    // implementation
+    expect(inventory.status).toBe(404)
+    expect(media.status).toBe(404)
     await server.close()
   })
 })

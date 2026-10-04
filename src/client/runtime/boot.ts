@@ -16,6 +16,7 @@ import { createEffectLedger } from './effect-ledger.ts'
 import { createSemanticAdapter } from './semantic-adapter.ts'
 import type { SemanticAdapter } from './semantic-adapter.ts'
 import { installShellRenderingAdapter } from './shell-rendering.ts'
+import { setComposerFrostSuppressed } from './backdrop-scene.ts'
 import { createSkinController } from './skin-controller.ts'
 import type { ControllerSkinEntry, SkinController } from './skin-controller.ts'
 
@@ -76,8 +77,17 @@ export interface BootOptions {
   doc?: Document
   apiBase?: string
   fetchImpl?: typeof fetch
-  /** Background-media priority: true suppresses skin manifest media (WE wallpaper wins). */
-  suppressBackgroundMedia?: () => boolean
+  /**
+   * External stand-down (issue #39): true while the delegated wallpaper plugin
+   * owns the visual, which withholds the skin entirely (its CSS, background
+   * media, hooks and backdrop marker). The user's selection is kept.
+   */
+  suppressSkin?: () => boolean
+  /**
+   * Composer-frost ownership: true while the delegated wallpaper plugin paints
+   * its own composer glass, so this runtime must not mount a second one.
+   */
+  suppressComposerFrost?: () => boolean
 }
 
 export function bootSkinRuntime(options: BootOptions = {}): SkinRuntimeStore {
@@ -91,7 +101,7 @@ export function bootSkinRuntime(options: BootOptions = {}): SkinRuntimeStore {
     ledger,
     apiBase,
     fetchImpl,
-    suppressBackgroundMedia: options.suppressBackgroundMedia,
+    suppressSkin: options.suppressSkin,
     // Switches fail closed to the previous skin; failures must still be
     // observable in the console (they are never thrown to the card).
     onError: (message, error) => {
@@ -101,6 +111,9 @@ export function bootSkinRuntime(options: BootOptions = {}): SkinRuntimeStore {
   const adapter = createSemanticAdapter(doc)
   adapter.start()
   const disposeShellRendering = installShellRenderingAdapter(doc)
+  // Seed the frost gate before any skin activation: a page that boots with an
+  // external wallpaper already rendering must never mount a second glass.
+  setComposerFrostSuppressed(doc, options.suppressComposerFrost?.() === true)
 
   let catalog: CatalogSkin[] | null = null
   let diagnostics: CatalogDiagnostic[] = []

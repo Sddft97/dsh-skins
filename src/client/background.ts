@@ -352,10 +352,11 @@ export class BackgroundController implements SkinBackgroundHandle {
    */
   private syncBlur(): void {
     if (this.disposed) return
-    if (this.hasWallpaper()) {
-      // The wallpaper module owns its own blur (wallpaperBlur); the skin-center
-      // background blur layer must stay off while a wallpaper is mounted so
-      // the two settings remain independent (#777 decouple).
+    if (this.hasExternalWallpaper()) {
+      // The delegated wallpaper plugin paints its own glass over its own
+      // backdrop, and this layer would sample a shell that plugin relaid
+      // (issue #39). Both the layer and the skin it belongs to stand down
+      // while that plugin renders.
       this.removeBlurElement()
       return
     }
@@ -374,9 +375,14 @@ export class BackgroundController implements SkinBackgroundHandle {
     return document.querySelector(CONVERSATION_CONTENT_SELECTOR) !== null
   }
 
-  /** True while a Wallpaper Engine wallpaper is mounted. */
-  private hasWallpaper(): boolean {
-    return document.documentElement.hasAttribute('data-dsh-wallpaper-active')
+  /**
+   * True while the delegated Wallpaper Engine plugin renders a wallpaper.
+   *
+   * The marker is the plugin's own stable `body` attribute (issue #39); this
+   * layer reads it, never writes it.
+   */
+  private hasExternalWallpaper(): boolean {
+    return document.body?.hasAttribute('data-we-wallpaper') === true
   }
 
   /** Create (if needed) and size the fixed backdrop-filter element. */
@@ -417,17 +423,15 @@ export class BackgroundController implements SkinBackgroundHandle {
     if (this.disposed || this.observer !== null) return
     if (this.blurEmptyValue <= 0 && this.blurContentValue <= 0) return
     this.observer = new MutationObserver(() => this.scheduleRecheck())
+    // ONE registration, both triggers. Two observe() calls on the same node
+    // would REPLACE each other: the second options object drops `subtree`, so
+    // the conversation-row watch would silently stop firing. The class filter
+    // covers the row flips and the external marker covers the wallpaper.
     this.observer.observe(document.body, {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['class'],
-    })
-    // Also react to the wallpaper marker so the background blur layer is
-    // removed/restored exactly when a wallpaper mounts/unmounts.
-    this.observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['data-dsh-wallpaper-active'],
+      attributeFilter: ['class', 'data-we-wallpaper'],
     })
   }
 
