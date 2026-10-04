@@ -8,6 +8,10 @@
 export type SkinCenterKey =
   | 'title'
   | 'cardDescription'
+  | 'coexistenceTitle'
+  | 'coexistenceBody'
+  | 'coexistenceSwitch'
+  | 'coexistenceLink'
   | 'enabled'
   | 'enabledHint'
   | 'offNote'
@@ -134,6 +138,10 @@ export type SkinCenterKey =
 export const en: Record<SkinCenterKey, string> = {
   title: 'Skin Center',
   cardDescription: 'Try on any installed skin live in the GUI — exit restores instantly, applying persists in one click.',
+  coexistenceTitle: 'Another wallpaper plugin is installed',
+  coexistenceBody: 'This profile also carries "{package}", which paints its own wallpaper layer, rewrites the shell and drives the theme. The two are alternatives: run one of them, or the backdrop layers overlay each other and both frosted-glass passes go wrong.',
+  coexistenceSwitch: 'Pick one with the plugin manager, then restart dsh: keep this card\'s built-in Wallpaper Engine bridge, or turn the bridge off and keep the standalone plugin. See this README for the exact steps.',
+  coexistenceLink: 'Open the standalone plugin\'s documentation',
   enabled: 'Enable skin center',
   enabledHint: 'When off, try-on, apply and background controls are disabled; turn it back on to resume.',
   offNote: 'The skin center is turned off.',
@@ -261,6 +269,10 @@ export const en: Record<SkinCenterKey, string> = {
 export const zh: Record<SkinCenterKey, string> = {
   title: '皮肤',
   cardDescription: '在 GUI 内即时试穿任意皮肤，退出即完全还原；应用一键完成并自动刷新。',
+  coexistenceTitle: '检测到另一个壁纸插件',
+  coexistenceBody: '当前 profile 同时装有「{package}」，它会画自己的壁纸层、改写壳层并驱动主题。两者是二选一：同时启用时两层背景互相覆盖，两套毛玻璃也会互相破坏。',
+  coexistenceSwitch: '请用插件管理器二选一，然后重启 dsh：保留本卡片自带的 Wallpaper Engine 桥，或关闭该桥、改用独立插件。具体步骤见本仓库 README。',
+  coexistenceLink: '打开独立插件的文档',
   enabled: '启用皮肤中心',
   enabledHint: '关闭后停用试穿、应用与背景控件，重新打开即恢复。',
   offNote: '皮肤中心已关闭。',

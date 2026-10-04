@@ -12,6 +12,7 @@
  *  - GET  /skins/<id>/assets/<path>    static in-directory assets (incl. preview/)
  *  - GET  /active                      the persisted active skin id + background preferences
  *  - POST /active                      persist active id and/or background (same-origin fenced)
+ *  - GET  /coexistence                 whether the standalone WE plugin shares this profile (issue #39)
  *
  * The stylesheet/patches responses pass through the CSS safety pipeline
  * (force-scoped under html[data-dsh-skin="<id>"], whitelist fail-closed), so
@@ -35,6 +36,7 @@ import { sanitizeSkinBackground, type SkinBackgroundConfig } from './core/backgr
 import { transformSkinCss, SkinCssSafetyError } from './core/css-safety/transform.ts'
 import { canServeSkinHooks, findSkin, loadSkinCatalog, repairSkin, resolveInsideSkin, shippedSkinIds, uninstallUserSkin, verifyAllSkinsIntegrity, verifyAndRepairAllSkins } from './skin-repo.ts'
 import { MARKET_PROVENANCE_FILENAME } from './provenance.ts'
+import { detectStandaloneWallpaperEngine, type CoexistenceReport } from './coexistence.ts'
 import type { SkinCatalog, SkinCatalogEntry } from './skin-repo.ts'
 
 export const SKIN_CENTER_V2_PREFIX = '/api/skin-center/v2'
@@ -72,6 +74,11 @@ export interface RoutesV2Deps {
   fetchImpl?: typeof fetch
   /** Local source dir mirror override (tests). */
   localSourceDir?: string
+  /**
+   * Standalone-Plugin coexistence probe (issue #39). The real probe reads the
+   * profile this package is installed into; tests hand in a fixed report.
+   */
+  detectCoexistence?: () => CoexistenceReport
 }
 
 function sendCss(res: ServerResponse, status: number, code: string): void {
@@ -155,6 +162,16 @@ export function makeSkinCenterV2Routes(deps: RoutesV2Deps = {}): WebRoute[] {
         })),
       diagnostics: catalog.diagnostics,
     })
+  }
+
+  // Read-only profile probe (issue #39): the card renders an advisory that the
+  // standalone Wallpaper Engine plugin and this bridge are alternatives. The
+  // probe reads the profile and nothing else, so the endpoint carries no
+  // same-origin fence beyond the family's read routes.
+  const detectCoexistence = deps.detectCoexistence ?? (() => detectStandaloneWallpaperEngine())
+  const coexistenceHandler: WebRoute['handler'] = (_req, res) => {
+    const report = detectCoexistence()
+    writeJson(res, 200, { ok: true, ...report })
   }
 
   const verifyHandler: WebRoute['handler'] = async (req, res) => {
@@ -349,6 +366,7 @@ export function makeSkinCenterV2Routes(deps: RoutesV2Deps = {}): WebRoute[] {
 
   return [
     { kind: 'exact', path: `${SKIN_CENTER_V2_PREFIX}/catalog`, handler: catalogHandler },
+    { kind: 'exact', path: `${SKIN_CENTER_V2_PREFIX}/coexistence`, handler: coexistenceHandler },
     { kind: 'exact', path: `${SKIN_CENTER_V2_PREFIX}/verify`, handler: verifyHandler },
     { kind: 'prefix', path: skinPrefix.replace(/\/$/, ''), handler: skinsHandler },
     { kind: 'exact', path: `${SKIN_CENTER_V2_PREFIX}/active`, handler: (req, res) => {

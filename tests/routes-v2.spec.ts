@@ -747,3 +747,53 @@ describe('v2 single skin repair route', () => {
     await server.close()
   })
 })
+
+describe('v2 coexistence probe route (issue #39)', () => {
+  it('serves the standalone-plugin report the card renders', async () => {
+    // Given a host whose profile also carries the standalone wallpaper plugin
+    const server = await serve(makeSkinCenterV2Routes({
+      loadCatalog: () => loadSkinCatalog({ builtinDir: builtin, userDir: join(root, 'user') }),
+      activeStatePath: statePath,
+      detectCoexistence: () => ({
+        detected: true,
+        signals: ['cordis-row'],
+        packageName: 'dsh-plugin-wallpaper-engine',
+        repository: 'https://github.com/elysia395/dsh-wallpaper-engine',
+      }),
+    }))
+
+    // When the card asks for the coexistence state
+    const res = await call(server.port, 'GET', `${SKIN_CENTER_V2_PREFIX}/coexistence`)
+
+    // Then the advisory input arrives under the family envelope
+    expect(res.status).toBe(200)
+    expect(res.jsonBody.ok).toBe(true)
+    expect(res.jsonBody.detected).toBe(true)
+    expect(res.jsonBody.packageName).toBe('dsh-plugin-wallpaper-engine')
+    expect(res.jsonBody.repository).toContain('elysia395/dsh-wallpaper-engine')
+    await server.close()
+  })
+
+  it('answers not detected without failing when the profile is clean', async () => {
+    // Given a profile with no standalone plugin signal
+    const server = await serve(makeSkinCenterV2Routes({
+      loadCatalog: () => loadSkinCatalog({ builtinDir: builtin, userDir: join(root, 'user') }),
+      activeStatePath: statePath,
+      detectCoexistence: () => ({
+        detected: false,
+        signals: [],
+        packageName: 'dsh-plugin-wallpaper-engine',
+        repository: 'https://github.com/elysia395/dsh-wallpaper-engine',
+      }),
+    }))
+
+    // When the card asks for the coexistence state
+    const res = await call(server.port, 'GET', `${SKIN_CENTER_V2_PREFIX}/coexistence`)
+
+    // Then a clean profile is a 200 with no notice to render, not an error
+    expect(res.status).toBe(200)
+    expect(res.jsonBody.detected).toBe(false)
+    expect(res.jsonBody.signals).toEqual([])
+    await server.close()
+  })
+})
