@@ -21,6 +21,7 @@ import type { SkinBackgroundHandle } from './background.ts'
 import type { WallpaperHandle } from './wallpaper.ts'
 import type { PreviewCoordinator } from './preview-coordinator.ts'
 import type { CustomThemeController } from './custom-theme-controller.ts'
+import { CoexistenceNotice } from './CoexistenceNotice.tsx'
 import { CustomThemeCard } from './CustomThemePanel.tsx'
 import { WallpaperPanel } from './WallpaperPanel.tsx'
 import { SliderControl } from './SliderControl.tsx'
@@ -401,6 +402,7 @@ export function SkinCenter({ t, runtime, theme, background, wallpaper, preview, 
       </div>
 
       <div className={css.cardBody}>
+            <CoexistenceNotice t={t} />
             <div className={css.enableRow}>
               <span className={css.enableLabel} title={t('enabled')}>{t('enabled')}</span>
               <button

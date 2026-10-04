@@ -66,6 +66,16 @@ dsh plugin --profile web add @linxin666/dsh-client-ui-skin-center
 
 skin-center is a self-contained bundle meeting the official DSH plugin standard (`dsh.bundle.patch` points to `cordis.patch.yml`); it can also be installed via git: `dsh plugin --profile web add github:<org>/dsh-web#<sha>` (the `prepare` script builds `lib/` in place). pnpm ≥10 requires authorizing `allowBuilds` before installing a git dependency; a local `link:` install has no such requirement.
 
+## Wallpaper Engine plugin coexistence
+
+The skin center ships its own Wallpaper Engine bridge and owns the GUI backdrop, so it and [dsh-wallpaper-engine](https://github.com/elysia395/dsh-wallpaper-engine) (`dsh-plugin-wallpaper-engine`) are alternatives, not companions: the two scan the same WE library and each paint a full-viewport fixed layer, each take over the shell (`data-dsh-skin` plus the shared shell-rendering adapter here; `body[data-we-wallpaper]` / `body[data-we-sidebar-glass]` there), each keep a fixed `backdrop-filter` element on the page, and each drive the light/dark theme. Running both overlays the two backdrops, invalidates both glass passes and fights over the theme, so pick one.
+
+- **Keep the skin center**: remove or disable `dsh-plugin-wallpaper-engine` from the profile, then restart the host (`dsh web`; DSH Desktop: fully quit the app and reopen it). Confirm the row is gone from the plugin list, and set your WE wallpaper in this card's wallpaper panel (设置 → 皮肤中心).
+- **Keep the standalone plugin**: remove or disable the skin center (`@linxin666/dsh-client-ui-skin-center`; where the `@linxin666/dsh-web-all` aggregate provides it, it is a child row of that bundle), then restart the same way. Its own settings page (设置 → Wallpaper Engine) then owns the wallpaper.
+- **Without uninstalling either**: stand the skin center down instead of removing it. Select 官方默认 (Official default) in the card's list to drop `html[data-dsh-skin]`, keep the custom theme off, clear the wallpaper selection, and turn off the card's own master switch (设置 → 皮肤中心 → Enable skin center). The card then paints nothing — no skin, no scrim, no backdrop-blur layer, no composer frost — and the shared shell-rendering corrections stay inert, because their selectors require an active skin, custom theme or wallpaper. The host route families, the boot-time DOM stamps and the page event wiring still belong to both installed plugins, so this is a stopgap, not a supported state.
+
+Both halves are host-side, so a page refresh is never enough: the loader rows and the `/api/skin-center/*` route family are decided at boot. The card probes the profile when it mounts and shows this advisory when it finds the package; the probe only reads, and it never installs, removes or disables anything. Install and switch commands for the other side are in [its README](https://github.com/elysia395/dsh-wallpaper-engine).
+
 ## Configuration
 
 - **Enable switch**: turns the whole card (try-on / apply / background controls) on or off; persisted in the v2 active-state document.

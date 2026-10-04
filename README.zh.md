@@ -66,6 +66,16 @@ dsh plugin --profile web add @linxin666/dsh-client-ui-skin-center
 
 皮肤中心是符合官方 DSH 插件标准的自包含 bundle（`dsh.bundle.patch` 指向 `cordis.patch.yml`）；也可经 git 安装：`dsh plugin --profile web add github:<org>/dsh-web#<sha>`（`prepare` 脚本就地构建 `lib/`）。pnpm ≥10 安装 git 依赖前需授权 `allowBuilds`；本地 `link:` 安装无此要求。
 
+## 与独立壁纸插件的关系
+
+皮肤中心自带 Wallpaper Engine 桥并接管 GUI 背景，因此它与 [dsh-wallpaper-engine](https://github.com/elysia395/dsh-wallpaper-engine)（`dsh-plugin-wallpaper-engine`）是二选一，而不是并存：两者扫描同一个 WE 壁纸库并各画一张铺满视口的固定层，各自接管壳层（这边是 `data-dsh-skin` 与公共壳层渲染适配器，那边是 `body[data-we-wallpaper]` / `body[data-we-sidebar-glass]`），各自在页面上保留一个固定 `backdrop-filter` 元素，也都驱动亮暗主题。同时启用会让两层背景互相覆盖、两套毛玻璃互相破坏，并争夺主题，因此请只保留一个。
+
+- **保留皮肤中心**：从 profile 卸载或停用 `dsh-plugin-wallpaper-engine`，然后重启宿主（`dsh web`；DSH Desktop 需完全退出应用后重新打开）。确认插件列表里该行已消失，壁纸改在本卡片的壁纸面板（设置 → 皮肤中心）里设置。
+- **保留独立插件**：卸载或停用皮肤中心（`@linxin666/dsh-client-ui-skin-center`；由 `@linxin666/dsh-web-all` 聚合包提供时，它是该 bundle 下的子行），同样重启。之后壁纸由它自己的设置页（设置 → Wallpaper Engine）接管。
+- **不卸载任何一方时**：把皮肤中心「停用」而不是卸载。在卡片列表里选中「官方默认」以摘掉 `html[data-dsh-skin]`，保持自定义主题关闭、清空壁纸选择，并关掉卡片自身的总开关（设置 → 皮肤中心 → 启用皮肤中心）。此时卡片不再绘制任何东西——无皮肤、无遮罩、无背景模糊层、无输入卡磨砂——公共壳层渲染修正也保持惰性，因为它们的选择器要求存在激活的皮肤、自定义主题或壁纸。但 host 路由族、启动期的 DOM 打标与页面事件接线仍同时属于两个已安装插件，因此这只是临时状态，而非受支持的状态。
+
+两边的半区都在 host，刷新页面永远不够：加载器行与 `/api/skin-center/*` 路由族在启动时决定。卡片挂载时会探测 profile，发现该包即显示这条提示；探测只读取，从不安装、卸载或停用任何东西。独立插件那一侧的安装与切换命令见[它的 README](https://github.com/elysia395/dsh-wallpaper-engine)。
+
 ## 配置
 
 - **总开关**：开关整张卡片（试穿 / 应用 / 背景控制）；持久化在 v2 活跃状态文档中。
