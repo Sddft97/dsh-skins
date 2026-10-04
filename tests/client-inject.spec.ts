@@ -1,17 +1,12 @@
 /**
  * The skin-center client plugin's Cordis contract (regression guard).
  *
- * The browse-directory button resolves the Host's native picker through the
- * generated Remote namespace service `remote.directoryPicker`. That is its
- * own Cordis service, NOT a property of `remote`: reading `ctx.remote.x`
- * while `remote.x` is not injected makes cordis' context proxy throw
- * `cannot get property "remote.x" without inject`. That is exactly the
- * "could not open the system folder picker" failure reported after clicking
- * Browse, so these tests pin both the declaration and the resolved call.
- *
- * The topology below mirrors the real one: the api-gateway provides
- * `remote`, and the api-remotes assembly mounts the picker namespace as a
- * NESTED fiber beneath it.
+ * The card used to require the `remote.directoryPicker` namespace for its
+ * Wallpaper Engine bridge's folder browser. That bridge is gone (issue #39):
+ * wallpaper configuration belongs to `dsh-plugin-wallpaper-engine`, which
+ * owns its own pickers. These tests pin that the inject list no longer names
+ * the picker — naming it would park the card on hosts that serve no picker —
+ * while still declaring the four services the card genuinely uses.
  */
 import { Context, Service } from '@deepseek-ai/cordis'
 import { describe, expect, it } from 'vitest'
@@ -21,10 +16,10 @@ class RemoteService extends Service {
   constructor(ctx: Context) { super(ctx, 'remote') }
 }
 
-/** The stub service tree the client plugin declares; only the remote faces matter. */
+/** The stub service tree the client plugin declares. */
 const STUB_SERVICES: Record<string, unknown> = {
   slots: { inject: () => () => {}, register: () => () => {} },
-  locale: { bind: () => (key: string) => key },
+  locale: { bind: () => (key: string) => key, register: () => () => {} },
   theme: {
     getTheme: () => ({ active: { colorScheme: 'dark' } }),
     subscribe: () => () => {},
@@ -39,11 +34,10 @@ const STUB_SERVICES: Record<string, unknown> = {
       mutate: async () => true,
     }),
   },
-  connection: {},
 }
 
-/** Mount the gateway + api-remotes topology and run one consumer plugin. */
-async function withPickerTopology(run: (ctx: Context) => void): Promise<void> {
+/** Mount the declared services and run one consumer plugin, with no picker. */
+async function withoutPickerTopology(run: (ctx: Context) => void): Promise<void> {
   const root = new Context()
   await root.plugin({
     name: 'stubs',
@@ -52,54 +46,43 @@ async function withPickerTopology(run: (ctx: Context) => void): Promise<void> {
       for (const [name, value] of Object.entries(STUB_SERVICES)) ctx.provide(name, value as never)
     },
   })
-  const remotes = root.plugin({
-    name: 'api-remotes',
-    inject: ['remote'],
-    apply(ctx) {
-      ctx.plugin({
-        name: 'remote.directoryPicker',
-        apply(child) {
-          child.provide('remote.directoryPicker', {
-            pick: async () => '/Users/me/wallpapers',
-          } as never)
-        },
-      })
-    },
-  })
-  await remotes
-  await new Promise(resolve => setTimeout(resolve, 30))
   const consumer = root.plugin({ name: 'skin-center', inject: [...inject], apply: run })
   await consumer
   await new Promise(resolve => setTimeout(resolve, 30))
 }
 
-describe('skin-center client injects the Remote faces it calls', () => {
-  it('names remote.directoryPicker so ctx.remote.directoryPicker is readable', () => {
+describe('skin-center client injects only the services it uses', () => {
+  it('does not require the directory picker the wallpaper bridge used', () => {
     // Given the plugin's declared required services
     // When the declaration is read
-    // Then the picker namespace is named explicitly: without it, cordis
-    // refuses the property lookup and the browse button can never work
-    expect(inject).toContain('remote.directoryPicker')
+    // Then the picker namespace is absent: the folder browser left with the
+    // built-in bridge, and naming a namespace the host may not serve would
+    // park the whole card waiting for it
+    expect(inject).not.toContain('remote.directoryPicker')
+    expect(inject).not.toContain('remote')
+    expect(inject).not.toContain('connection')
   })
 
-  it('resolves the picker through the real nested-namespace topology', async () => {
-    // Given the gateway/api-remotes topology that mounts the namespace
-    let picked: string | null = null
+  it('declares the four services the card actually uses', () => {
+    // Given the plugin's declared required services
+    // When the declaration is read
+    // Then slots (the settings section), locale (its copy), theme (the
+    // preview toggle) and configForms (its preference sections) are named
+    expect([...inject].sort()).toEqual(['configForms', 'locale', 'slots', 'theme'])
+  })
+
+  it('mounts on a host that serves no picker at all', async () => {
+    // Given a host whose only services are the four the card needs
+    let applied = false
     let failure: string | null = null
-    await withPickerTopology((ctx) => {
-      try {
-        // When the plugin calls the picker exactly as its pickDir face does
-        void ctx.remote.directoryPicker.pick().then(
-          (path) => { picked = path },
-          (error: unknown) => { failure = error instanceof Error ? error.message : String(error) },
-        )
-      } catch (error) {
-        failure = error instanceof Error ? error.message : String(error)
-      }
+
+    // When the plugin is mounted
+    await withoutPickerTopology(() => { applied = true }).catch((error: unknown) => {
+      failure = error instanceof Error ? error.message : String(error)
     })
 
-    // Then the call reaches the Host instead of throwing the inject error
+    // Then it applies instead of parking or throwing
     expect(failure).toBeNull()
-    expect(picked).toBe('/Users/me/wallpapers')
+    expect(applied).toBe(true)
   })
 })

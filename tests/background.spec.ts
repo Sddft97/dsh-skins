@@ -61,7 +61,7 @@ function removeConversationRow(): void {
 describe('BackgroundController', () => {
   beforeEach(() => {
     document.body.innerHTML = ''
-    document.documentElement.removeAttribute('data-dsh-wallpaper-active')
+    document.body.removeAttribute('data-we-wallpaper')
   })
 
   it('defaults: no blur element and the occlusion var is still set', () => {
@@ -150,15 +150,23 @@ describe('BackgroundController', () => {
     controller.dispose()
   })
 
-  it('wallpaper active suppresses the background blur layer even with nonzero blur (#777 decouple)', () => {
-    document.documentElement.setAttribute('data-dsh-wallpaper-active', 'true')
+  it('the delegated wallpaper plugin suppresses the blur layer while it renders (issue #39)', () => {
+    // Given the external plugin is rendering a wallpaper
+    document.body.setAttribute('data-we-wallpaper', '')
     const { controller } = rig({ backgroundBlurEmpty: 6 })
-    expect(blurElement()).toBeNull()
+
+    // When a nonzero blur is applied
     controller.setBlurEmpty(10)
+
+    // Then the skin side's blur layer stays off: that plugin paints its own
+    // glass over its own backdrop
     expect(blurElement()).toBeNull()
-    // Unmount wallpaper: the blur layer is allowed again on the next sync.
-    document.documentElement.removeAttribute('data-dsh-wallpaper-active')
+
+    // When the wallpaper stops
+    document.body.removeAttribute('data-we-wallpaper')
     controller.setBlurEmpty(10)
+
+    // Then the layer is allowed again
     expect(blurElement()).not.toBeNull()
     expect(blurElement()!.style.backdropFilter).toContain('blur(10px)')
     controller.dispose()

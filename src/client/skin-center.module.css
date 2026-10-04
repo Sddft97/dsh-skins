@@ -68,10 +68,10 @@ body[data-dsh-skin-center] .cardBody {
   border-top: 1px solid var(--dsw-alias-border-l2);
 }
 
-/* Coexistence advisory (issue #39): a read-only state notice, so it rides the
-   warning state tokens rather than the brand accent — nothing here is
-   clickable except the documentation link. */
-body[data-dsh-skin-center] .coexistenceNotice {
+/* Delegated wallpaper plugin pointer (issue #39): a read-only state notice, so
+   it rides the warning state tokens rather than the brand accent — nothing here
+   is interactive except the documentation link. */
+body[data-dsh-skin-center] .externalWallpaperNotice {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -81,27 +81,41 @@ body[data-dsh-skin-center] .coexistenceNotice {
   border: 1px solid var(--dsw-alias-state-warning-tertiary, #feebd3);
 }
 
-body[data-dsh-skin-center] .coexistenceTitle {
+body[data-dsh-skin-center] .externalWallpaperTitle {
   font-size: 13px;
   font-weight: 600;
   color: var(--dsw-alias-state-warning-primary, #b06000);
 }
 
-body[data-dsh-skin-center] .coexistenceBody,
-body[data-dsh-skin-center] .coexistenceSwitch {
+body[data-dsh-skin-center] .externalWallpaperBody {
   margin: 0;
   font-size: 12px;
   line-height: 1.5;
   color: var(--dsw-alias-label-secondary, #6b7280);
 }
 
-body[data-dsh-skin-center] .coexistenceLink {
+/* The install command: a copyable one-liner, so it reads as data, not prose. */
+body[data-dsh-skin-center] .externalWallpaperCommand {
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 4px 8px;
+  border-radius: 6px;
+  overflow-x: auto;
+  white-space: nowrap;
+  font-family: var(--dsw-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-layer-3);
+  border: 1px solid var(--dsw-alias-border-l2);
+}
+
+body[data-dsh-skin-center] .externalWallpaperLink {
   align-self: flex-start;
   font-size: 12px;
   color: var(--dsw-alias-brand-primary, #1e63b8);
 }
 
-body[data-dsh-skin-center] .coexistenceLink:hover {
+body[data-dsh-skin-center] .externalWallpaperLink:hover {
   text-decoration: underline;
 }
 

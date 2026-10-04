@@ -1,4 +1,4 @@
-# dsh-skins · DeepSeek Harness (DSH) 皮肤中心与 Wallpaper Engine 动态主题工坊
+# dsh-skins · DeepSeek Harness (DSH) 皮肤中心
 
 [English](README.md) | 中文
 
@@ -12,7 +12,7 @@
 
 <p align="center">
   <strong>DeepSeek Harness（DSH）官方 Web GUI 与桌面客户端专属主题与个性化美化引擎</strong><br>
-  <em>主题换肤 · Wallpaper Engine 动态壁纸 · 毛玻璃高斯模糊 · 自定义深浅色配色 · 创意工坊即时试穿</em>
+  <em>主题换肤 · 毛玻璃高斯模糊 · 自定义深浅色配色 · 创意工坊即时试穿 · Wallpaper Engine 由专用插件提供</em>
 </p>
 
 `@linxin666/dsh-client-ui-skin-center`（cordis 插件 id `ui-skin-center`）是 dsh Web GUI 唯一的皮肤包：它把皮肤列表 / 试穿 / 应用做成一级设置分区「皮肤中心」（设置 → 皮肤中心，只列已安装皮肤），并且是所有皮肤的唯一加载器与渲染器。皮肤是纯资产目录——没有 package.json、不发 npm、不接 cordis 接线——只与皮肤中心契约（`contracts/`）耦合；皮肤中心把对官方 DSH 的全部耦合吸收在契约之后。卡片自带总开关（关闭即停用试穿、应用与背景控制）。
@@ -22,10 +22,9 @@
 - 试穿 / 应用：两者走同一个原子切换引擎（`src/client/runtime/skin-controller.ts`）。一次切换 = 一个新的 activation identity：取回已限定作用域的样式表，安装样式、背景媒体与可选 hooks，翻转 `html[data-dsh-skin="<id>"]`，然后销毁上一个 activation（append-only 效果账本，幂等清理）。最新请求永远胜出；失败或被淘汰的切换完整保留旧皮肤。试穿是同一个切换但不落盘——「退出试穿」恢复已提交的皮肤。应用会持久化选择（`POST /api/skin-center/v2/active`）。不刷新页面、不改写 `cordis.patch.yml`、不重建启动图。
 - 首屏：host 半区注册一个 index.html 转换（`webServer.tapIndex`，单一适配模块 `src/tap-index-adapter.ts`），向每份送达的文档盖 `html[data-dsh-skin]` 属性并插入样式表链接，刷新后直接以当前皮肤启动，无官方原貌闪屏。tap 出任何问题都 fail-closed 回官方原貌。
 - 皮肤格式（v2）：`skin.json`（fail-closed 校验，v1 字段 `package`/`wiring`/`bodyAttr` 忽略并给迁移警告）、`skin.css`（L1 token 重映射 + L2 语义选择器）、可选 `patches.css`（L3 自由选择器，高敏感）、可选 `hooks.mjs`（受信逃逸舱，高敏感）、`assets/`、`preview/`。所有 CSS 经过安全管线（`src/core/css-safety/transform.ts`）：每个选择器强制限定在 `html[data-dsh-skin]` 下，`@import` / 远程或协议相对 URL / 越界路径直接报错。见 `contracts/README.md`。
-- 覆盖契约：L1 重映射官方 `--dsw-*` 设计 token；L2 样式语义属性（`data-dsh-surface` / `data-dsh-part` / `data-dsh-plugin`，枚举见 `contracts/semantic-attrs-v1.md`），由兼容适配器（`src/client/runtime/semantic-adapter.ts`）从稳定锚点（`data-slot` 出口、`data-chat-flow-kind` 等）为官方壳层 DOM 打标；L3 补丁任意选择器，脆弱性由皮肤作者自负。主动输出语义属性的插件获得完整 L2 覆盖；不输出的只享受 L1。目录皮肤、自定义主题或壁纸激活期间还会启用公共壳层渲染适配器：它清除工作区列表末端 fade，将 composer 占位符固定为不透明的主题次级文本色，并为会话滚动口保留底部安全间距以保证吸底正文不被输入区覆盖（#978），各皮肤无需重复补丁。
-- 背景优先级：Wallpaper Engine 壁纸永远优先于用户手动背景遮罩，后者优先于皮肤清单背景媒体；开关壁纸会实时重估优先级。
+- 覆盖契约：L1 重映射官方 `--dsw-*` 设计 token；L2 样式语义属性（`data-dsh-surface` / `data-dsh-part` / `data-dsh-plugin`，枚举见 `contracts/semantic-attrs-v1.md`），由兼容适配器（`src/client/runtime/semantic-adapter.ts`）从稳定锚点（`data-slot` 出口、`data-chat-flow-kind` 等）为官方壳层 DOM 打标；L3 补丁任意选择器，脆弱性由皮肤作者自负。主动输出语义属性的插件获得完整 L2 覆盖；不输出的只享受 L1。目录皮肤或自定义主题激活期间还会启用公共壳层渲染适配器：它清除工作区列表末端 fade，将 composer 占位符固定为不透明的主题次级文本色，并为会话滚动口保留底部安全间距以保证吸底正文不被输入区覆盖（#978），各皮肤无需重复补丁。
+- 背景优先级：壁纸渲染期间皮肤及其背景媒体整体停画（见「Wallpaper Engine」），背景完全归壁纸；否则皮肤清单背景媒体即背景。
 - 背景控制：背景遮蔽滑杆（0–100%）为画背景的皮肤在面板后加纱，两个按状态的高斯模糊滑杆（0–20 px）分别控制空对话与有内容时的背景，输入卡模糊滑杆（0–20 px）只控制输入卡背后的磨砂区域，气泡不透明度滑杆（0–100%）控制支持气泡 alpha 的皮肤消息气泡。整张壁纸模糊仍是独立的壁纸设置。背景模糊通过外壳之后的固定 `backdrop-filter` 元素施加；0 完全关闭（无元素、无 GPU 开销）。输入卡磨砂由独立的 body 级固定跟随层（`data-dsh-composer-frost` 元素）承担并按输入卡尺寸跟随，**不**挂在卡片本体上：卡片一旦带 `backdrop-filter` 就会成为其中 shell fixed tooltip 的包含块，悬停时整页会话会被顶动。
-- Wallpaper Engine 桥：卡片可把本机 Wallpaper Engine 库用作 GUI 背景。host 半区（`src/we-library.ts` + `src/we-routes.ts`）定位 WE 安装（Steam 应用 431960：Windows 注册表、`libraryfolders.vdf` 中的全部库路径、持久的 `appmanifest_431960.acf` 所有权事实与探测路径），扫描项目与创意工坊内容及可选手动文件夹，经同源 `/api/skin-center/we/*` 路由提供清单、媒体（Range 流式）、预览图、web 壁纸项目文件（注入 WE API shim）与场景壁纸主贴图 PNG（由 `src/pkg-extract.ts` 进程内解码 PKG/TEX，磁盘缓存）。视频壁纸用 `<video>` 渲染，web 壁纸用沙箱 `<iframe>`，场景壁纸经内置 WebGL 播放器实时渲染（2D 图层场景与 3D 模型场景按 WE 材质/着色器语义回放）；场景内嵌脚本会被忽略，但受支持的图像、反射、水面与粒子通道仍保持实时渲染，「静态帧」模式可为任意类型钉一张零动画开销的图。单张壁纸的导入会把项目复制进 `<harness-home>/skin-center/wallpapers/`，脱离 Steam 库变更也能用，并检测创意工坊原作更新。壁纸都是用户本机文件，从不上传或再分发——创意工坊内容归原作者。「手动文件夹」行可接收零散 `.mp4`/`.webm` 媒体、单个项目、项目合集、Wallpaper Engine 安装根目录或 Steam 库根目录（`~` 展开为主目录）。
 - 旧版迁移：v2 升级后的首次启动，一次性桥（`src/legacy-bridge.ts`）读取 harness home 根 `cordis.patch.yml`（v1 CLI 写入处；活动 profile 的 `cordis.patch.yml` 作为次级位置也会探测）里已退役的 `dsh-skin` 受管段，把活动皮肤 id 迁进 v2 选择存储，并清除旧行。迁移幂等且 fail-closed（出错时旧状态原样保留）。仅在发生迁移、清理或失败时输出日志，无 legacy 状态的稳态保持静默（issue #788）。
 
 
@@ -34,7 +33,7 @@
 | 核心使用场景 | 原生 DSH Web 局限 | 皮肤中心（dsh-skins）解决方案 |
 |---|---|---|
 | 个性化界面视觉与护眼暗色模式 | 仅支持单一官方默认黑白主题 | 内置经典 Blue Fantasy 蓝色幻想暗色主题，支持从创意工坊一键安装数十款精美主题 |
-| Wallpaper Engine 动态壁纸交互背景 | 无法使用动态壁纸或视频背景 | 深度桥接本机 Steam Wallpaper Engine，支持视频壁纸、Web 壁纸与 2D/3D WebGL 实时场景壁纸 |
+| Wallpaper Engine 动态壁纸交互背景 | 无法使用动态壁纸或视频背景 | 交给专用的 dsh-wallpaper-engine 插件（视频、Web 与 2D/3D WebGL 实时场景壁纸），本卡片负责安装指引并把背景让给它 |
 | 毛玻璃背景模糊与输入卡磨砂控制 | 界面背景单一，无视觉层次感 | 提供全局背景遮罩（0–100%）、空会话/有内容动态高斯模糊、输入框局部磨砂跟随与气泡透明度滑杆 |
 | 自定义品牌与个性配色重映射 | 无法自定义主题颜色与对比度 | 独立编辑浅色/深色强调色、背景色、前景色与对比度，自动生成审计级 CSS token 覆盖层 |
 | 主题资产即时试穿与无感热切换 | 更换主题需重启服务或刷新页面 | 原子切换引擎实现一键即时试穿、退出恢复与持久化应用，刷新直接以当前皮肤启动零白屏闪烁 |
@@ -66,24 +65,37 @@ dsh plugin --profile web add @linxin666/dsh-client-ui-skin-center
 
 皮肤中心是符合官方 DSH 插件标准的自包含 bundle（`dsh.bundle.patch` 指向 `cordis.patch.yml`）；也可经 git 安装：`dsh plugin --profile web add github:<org>/dsh-web#<sha>`（`prepare` 脚本就地构建 `lib/`）。pnpm ≥10 安装 git 依赖前需授权 `allowBuilds`；本地 `link:` 安装无此要求。
 
-## 与独立壁纸插件的关系
+## Wallpaper Engine
 
-皮肤中心自带 Wallpaper Engine 桥并接管 GUI 背景，因此它与 [dsh-wallpaper-engine](https://github.com/elysia395/dsh-wallpaper-engine)（`dsh-plugin-wallpaper-engine`）是二选一，而不是并存：两者扫描同一个 WE 壁纸库并各画一张铺满视口的固定层，各自接管壳层（这边是 `data-dsh-skin` 与公共壳层渲染适配器，那边是 `body[data-we-wallpaper]` / `body[data-we-sidebar-glass]`），各自在页面上保留一个固定 `backdrop-filter` 元素，也都驱动亮暗主题。同时启用会让两层背景互相覆盖、两套毛玻璃互相破坏，并争夺主题，因此请只保留一个。
+Wallpaper Engine 支持**不再内置**在本包。它由独立插件 [dsh-wallpaper-engine](https://github.com/elysia395/dsh-wallpaper-engine)（`dsh-plugin-wallpaper-engine`）提供，壁纸库、视频 / 网页 / 场景三条渲染路径、壁纸设置面与壁纸之上的玻璃都归它管。
 
-- **保留皮肤中心**：从 profile 卸载或停用 `dsh-plugin-wallpaper-engine`，然后重启宿主（`dsh web`；DSH Desktop 需完全退出应用后重新打开）。确认插件列表里该行已消失，壁纸改在本卡片的壁纸面板（设置 → 皮肤中心）里设置。
-- **保留独立插件**：卸载或停用皮肤中心（`@linxin666/dsh-client-ui-skin-center`；由 `@linxin666/dsh-web-all` 聚合包提供时，它是该 bundle 下的子行），同样重启。之后壁纸由它自己的设置页（设置 → Wallpaper Engine）接管。
-- **不卸载任何一方时**：把皮肤中心「停用」而不是卸载。在卡片列表里选中「官方默认」以摘掉 `html[data-dsh-skin]`，保持自定义主题关闭、清空壁纸选择，并关掉卡片自身的总开关（设置 → 皮肤中心 → 启用皮肤中心）。此时卡片不再绘制任何东西——无皮肤、无遮罩、无背景模糊层、无输入卡磨砂——公共壳层渲染修正也保持惰性，因为它们的选择器要求存在激活的皮肤、自定义主题或壁纸。但 host 路由族、启动期的 DOM 打标与页面事件接线仍同时属于两个已安装插件，因此这只是临时状态，而非受支持的状态。
+```sh
+dsh plugin --profile web add dsh-plugin-wallpaper-engine
+```
 
-两边的半区都在 host，刷新页面永远不够：加载器行与 `/api/skin-center/*` 路由族在启动时决定。卡片挂载时会探测 profile，发现该包即显示这条提示；探测只读取，从不安装、卸载或停用任何东西。独立插件那一侧的安装与切换命令见[它的 README](https://github.com/elysia395/dsh-wallpaper-engine)。
+装完重启宿主（`dsh web`；DSH Desktop 需完全退出应用后重新打开）。该插件自带设置页用于选择与调节壁纸；未安装时皮肤中心卡片会指向它。
+
+### 两者如何共处一页
+
+两个插件轮流上阵而不是互相覆盖，切换是自动的：
+
+- **壁纸渲染期间**，该插件给 `body` 打上稳定属性 `data-we-wallpaper`。皮肤中心读取该属性并**整体停掉自己的视觉工作**：不加载皮肤 CSS、不画皮肤背景图、不跑 hooks、不挂输入卡磨砂，并把 `html[data-dsh-skin]` 属性从页面上撤下。你在皮肤中心选的皮肤会被记住但不绘制——该插件改写了同一个壳层并画自己的玻璃，其他东西只会与它相争。
+- **壁纸停止时**，属性清除，被记住的皮肤自动重新上妆，无需刷新、无需重新应用。
+
+停画期间卡片会写明原因，因此「皮肤不见了」读起来是一个状态而不是故障。壁纸期间应用的皮肤同样会落盘，并在壁纸停止后生效。皮肤中心从不写该插件的状态，该插件也从不写皮肤中心的状态。
+
+### 皮肤与壁纸
+
+皮肤背景图属于皮肤自身外观的一部分，因此壁纸渲染期间会随皮肤整体停画。自带满幅底板的皮肤（目录里的 ground-plate 画布类）另把让路规则锚定在 `body[data-we-wallpaper]` 上，从而主动让位而不是争夺背景。
 
 ## 配置
 
 - **总开关**：开关整张卡片（试穿 / 应用 / 背景控制）；持久化在 v2 活跃状态文档中。
 - **背景滑杆**：遮蔽（0–100%）、两个背景模糊半径、输入卡模糊（0–20 px）与气泡不透明度（0–100%），持久化在同一 v2 文档中。
 - **背景持久化（支持远程）**：背景设置存放在 v2 活跃状态文档（`$DSH_HOME/skin-center-active.json` 的 `background` 段），经 `GET|POST /api/skin-center/v2/active` 读写，因此已配对的远程桌面（settings 通道仅限本机回环）也能读取并跨会话保存。插件自身配置中的 `skin-background` 段保留为设置页的输入面：已定制的配置在启动时一次性迁移进 v2 存储，之后的设置页修改由客户端转发。卡片内的修改不回写该设置页，因此它可能显示旧值，直到下一次从设置页修改。
-- **壁纸面板**：媒体库文件夹、选择、渲染模式（实时 / 静态帧）、压暗、模糊、隐藏时暂停、声音开关与音量；持久化在插件自身配置的 `skin-wallpaper` 段。
-- **自定义主题**：浅色/深色的强调色、背景色、前景色、对比度配置及应用标记，以版本化契约持久化在插件自身配置的 `skin-custom-theme` 段；壁纸选择与渲染仍完全由 `skin-wallpaper` 负责。
-- **这些设置放在哪里**：以上三段同属一份插件配置——该 profile 条目自己的 `Config`。宿主据此 schema 在 GUI 中生成该条目的设置页，卡片写入的是同一批值；不存在单独的 settings 文档。
+- **自定义主题**：浅色/深色的强调色、背景色、前景色、对比度配置及应用标记，以版本化契约持久化在插件自身配置的 `skin-custom-theme` 段。
+- **壁纸设置**：不属于本配置。它们归 `dsh-plugin-wallpaper-engine`，由该插件提供自己的设置页；旧 profile 里遗留的 `skin-wallpaper` 段会被忽略，且不会被改写。
+- **这些设置放在哪里**：以上两段同属一份插件配置——该 profile 条目自己的 `Config`。宿主据此 schema 在 GUI 中生成该条目的设置页，卡片写入的是同一批值；不存在单独的 settings 文档。
 - **用户皮肤目录**：`$DSH_HOME/skins/<id>/`；覆盖优先级为 `DSH_SKINS_HOME`、`DSH_SKINS_DIR`、`$DSH_HOME/skins`。
 
 ## 安全模型
@@ -97,7 +109,7 @@ dsh plugin --profile web add @linxin666/dsh-client-ui-skin-center
 
 - 插件运行时写入的内联样式只能经 L3 `!important` 补丁覆盖。
 - 不输出语义属性（且无稳定 DOM 锚点）的插件只享受 L1 token 覆盖。
-- 皮肤视频背景不受壁纸「隐藏时暂停」设置影响；该设置仅作用于 Wallpaper Engine 桥。
+- 壁纸的「隐藏时暂停」、模糊、压暗与声音都在 `dsh-plugin-wallpaper-engine` 自己的设置里；皮肤中心没有任何壁纸控件，卡片只报告该插件的状态。
 
 ## 数据遥测
 
@@ -118,12 +130,13 @@ skins/skin-center/
   src/active-state.ts                       # 活动皮肤选择持久化
   src/legacy-bridge.ts                      # 一次性 v1 → v2 迁移
   src/http-utils.ts / harness-home.ts       # 路由共享助手 / DSH 路径解析
-  src/we-library.ts / we-routes.ts / we-shim-source.ts / pkg-extract.ts   # Wallpaper Engine 桥
   src/client/runtime/                       # 效果账本、装饰层、语义适配器、切换控制器、启动存储
   src/client/SkinCenter.tsx                 # 设置卡片
   src/core/custom-theme.ts                  # 版本化配色契约 + 经审计的纯 token CSS 生成器
   src/client/custom-theme-controller.ts / CustomThemePanel.tsx            # 持久化/运行时控制器 + 编辑卡片
-  src/client/background.ts / wallpaper.ts / WallpaperPanel.tsx            # 遮罩 + 模糊 / WE 桥 UI
+  src/client/background.ts                  # 遮罩 + 模糊控制
+  src/external-wallpaper.ts                 # 只读探测独立壁纸插件
+  src/client/runtime/external-wallpaper-engine.ts   # 该插件渲染期间停画皮肤
   skins/<id>/                               # 内置皮肤（纯资产目录）
 ```
 
@@ -134,4 +147,5 @@ skins/skin-center/
 - [x] 试穿即时生效，退出完整恢复已提交皮肤；页面上永远只有一套皮肤
 - [x] 一键应用原子切换、无需刷新；后续页面加载直接以该皮肤启动（无 FOUC）
 - [x] 自定义主题保留独立浅色/深色配置、刷新后恢复，且不会覆盖已激活的目录册皮肤
-- [x] Wallpaper Engine 桥、背景遮罩与模糊控制不受换肤影响
+- [x] 背景遮罩与模糊控制不受换肤影响
+- [x] 独立壁纸插件渲染期间，本插件不留下任何皮肤、玻璃或背景图；它停止后被记住的皮肤自动恢复

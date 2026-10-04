@@ -165,7 +165,9 @@ describe('shared shell rendering adapter (#954)', () => {
     const css = shellRenderingCss()
     expect(css).toContain('html[data-dsh-skin],')
     expect(css).toContain('html[data-dsh-custom-theme]:not([data-dsh-skin]),')
-    expect(css).toContain('html[data-dsh-wallpaper-active],')
+    // The wallpaper mode left this adapter with the built-in bridge (#39): the
+    // delegated plugin owns its own shell corrections
+    expect(css).not.toContain('data-dsh-wallpaper-active')
     expect(css).toContain('overflow: hidden !important;')
     expect(css).toContain('height: 100% !important;')
     expect(css).toContain('width: 100% !important;')
@@ -177,7 +179,6 @@ describe('shared shell rendering adapter (#954)', () => {
     const css = shellRenderingCss()
     expect(css).toContain('html[data-dsh-skin] [data-slot="sidebar.workspaces"] [class*="_fade"]')
     expect(css).toContain('html[data-dsh-custom-theme]:not([data-dsh-skin]) [data-slot="sidebar.workspaces"]')
-    expect(css).toContain('html[data-dsh-wallpaper-active] [data-slot="sidebar.workspaces"]')
     expect(css).toContain('background-image: none !important;')
     expect(css).not.toMatch(/^\s*\[data-slot="sidebar\.workspaces"\]/m)
   })
@@ -460,13 +461,13 @@ describe('skin controller', () => {
     expect(persist).toHaveBeenCalledTimes(1)
 
     await controller.tryOn('matrix', entryFor('matrix'))
-    expect(controller.getState()).toEqual({ active: 'matrix', trying: 'matrix', previewing: true })
+    expect(controller.getState()).toEqual({ active: 'matrix', trying: 'matrix', stoodDown: false, previewing: true })
     expect(document.documentElement.getAttribute('data-dsh-skin')).toBe('matrix')
     // Try-on never persists.
     expect(persist).toHaveBeenCalledTimes(1)
 
     await controller.exitTryOn()
-    expect(controller.getState()).toEqual({ active: 'harbor', trying: null, previewing: false })
+    expect(controller.getState()).toEqual({ active: 'harbor', trying: null, stoodDown: false, previewing: false })
     expect(document.documentElement.getAttribute('data-dsh-skin')).toBe('harbor')
     expect(persist).toHaveBeenCalledTimes(1)
   })
@@ -477,7 +478,7 @@ describe('skin controller', () => {
     expect(controller.getState().trying).toBe('matrix')
     expect(controller.getState().previewing).toBe(true)
     await controller.switchTo('matrix', entryFor('matrix'))
-    expect(controller.getState()).toEqual({ active: 'matrix', trying: null, previewing: false })
+    expect(controller.getState()).toEqual({ active: 'matrix', trying: null, stoodDown: false, previewing: false })
   })
 
   it('getState returns a cached snapshot (React useSyncExternalStore contract)', async () => {
@@ -487,7 +488,7 @@ describe('skin controller', () => {
     await controller.switchTo('harbor', entryFor('harbor'))
     const second = controller.getState()
     expect(second).not.toBe(first)
-    expect(second).toEqual({ active: 'harbor', trying: null, previewing: false })
+    expect(second).toEqual({ active: 'harbor', trying: null, stoodDown: false, previewing: false })
     expect(controller.getState()).toBe(second)
   })
 
@@ -499,7 +500,7 @@ describe('skin controller', () => {
     await controller.tryOn('matrix', entryFor('matrix'))
     await controller.exitTryOn()
     expect(seen.length).toBeGreaterThanOrEqual(3)
-    expect(seen.at(-1)).toEqual({ active: 'harbor', trying: null, previewing: false })
+    expect(seen.at(-1)).toEqual({ active: 'harbor', trying: null, stoodDown: false, previewing: false })
   })
 
   it('a refresh with an unchanged suppression verdict is a no-op (boot race)', async () => {
@@ -527,10 +528,10 @@ describe('skin controller', () => {
       ledger,
       loadStylesheet,
       persist: async () => {},
-      // Suppression is false from creation; the wallpaper scope publishes
-      // during boot, but a same-verdict refresh must not re-switch and
+      // Stand-down is false from creation; the external plugin's marker is
+      // read during boot, but a same-verdict refresh must not re-switch and
       // wipe the just-applied background.
-      suppressBackgroundMedia: () => false,
+      suppressSkin: () => false,
     })
     await controller.switchTo('media-skin', mediaEntry)
     expect(backgroundImgSrc()).toContain('bg.jpg')
@@ -539,7 +540,7 @@ describe('skin controller', () => {
     expect(controller.active).toBe('media-skin')
   })
 
-  it('suppressBackgroundMedia wins over the manifest background (WE priority)', async () => {
+  it('an external wallpaper withholds the whole skin and gives it back when it stops (issue #39)', async () => {
     document.head.innerHTML = ''
     document.body.innerHTML = ''
     document.documentElement.removeAttribute('data-dsh-skin')
@@ -565,24 +566,75 @@ describe('skin controller', () => {
       ledger,
       loadStylesheet,
       persist: async () => {},
-      suppressBackgroundMedia: () => suppressed,
+      suppressSkin: () => suppressed,
     })
     await controller.switchTo('media-skin', mediaEntry)
     expect(backgroundImgSrc()).toContain('bg.jpg')
     expect(document.body.getAttribute('data-dsh-backdrop-active')).toBe('true')
+    expect(document.documentElement.getAttribute('data-dsh-skin')).toBe('media-skin')
+    expect(controller.getState().stoodDown).toBe(false)
 
-    // The wallpaper bridge turns on: refresh drops the manifest media.
+    // The external plugin starts rendering a wallpaper: the ENTIRE skin is
+    // withheld, not merely its background art — its CSS comes off the page
+    // because that plugin rewrites the same shell and paints its own glass.
     suppressed = true
     await controller.refresh()
+    expect(document.documentElement.hasAttribute('data-dsh-skin')).toBe(false)
+    expect(document.head.querySelectorAll('link[rel="stylesheet"]')).toHaveLength(0)
     expect(backgroundImgSrc()).toBe('')
     expect(document.body.hasAttribute('data-dsh-backdrop-active')).toBe(false)
+    // The user's choice survives the stand-down, and the card can say so.
     expect(controller.active).toBe('media-skin')
+    expect(controller.getState().stoodDown).toBe(true)
 
-    // And back: refresh repaints it.
+    // And back: the same selection repaints untouched when the wallpaper stops.
     suppressed = false
     await controller.refresh()
+    expect(document.documentElement.getAttribute('data-dsh-skin')).toBe('media-skin')
     expect(backgroundImgSrc()).toContain('bg.jpg')
     expect(document.body.getAttribute('data-dsh-backdrop-active')).toBe('true')
+    expect(controller.getState().stoodDown).toBe(false)
+  })
+
+  it('keeps an applied skin through a stand-down and repaints it without re-applying (#39)', async () => {
+    document.head.innerHTML = ''
+    document.body.innerHTML = ''
+    document.documentElement.removeAttribute('data-dsh-skin')
+    const ledger = createEffectLedger()
+    let suppressed = false
+    const persisted: Array<string | null> = []
+    const loadStylesheet = async (href: string) => {
+      const link = document.createElement('link')
+      link.rel = 'stylesheet'
+      link.href = href
+      document.head.appendChild(link)
+    }
+    const controller = createSkinController({
+      doc: document,
+      ledger,
+      loadStylesheet,
+      persist: async (id) => { persisted.push(id) },
+      suppressSkin: () => suppressed,
+    })
+
+    // Given a skin is applied while the external plugin owns the visual
+    suppressed = true
+    await controller.switchTo('media-skin', {
+      manifest: { id: 'media-skin', contributes: { stylesheet: 'skin.css' } },
+    } as ControllerSkinEntry)
+
+    // Then the choice is persisted but nothing is painted
+    expect(persisted).toEqual(['media-skin'])
+    expect(controller.active).toBe('media-skin')
+    expect(document.documentElement.hasAttribute('data-dsh-skin')).toBe(false)
+
+    // When the wallpaper stops
+    suppressed = false
+    await controller.refresh()
+
+    // Then the skin paints from the remembered selection, with no extra write
+    expect(document.documentElement.getAttribute('data-dsh-skin')).toBe('media-skin')
+    expect(persisted).toEqual(['media-skin'])
   })
 
   it('disposing an older activation never wipes a newer activation\'s layer content', async () => {

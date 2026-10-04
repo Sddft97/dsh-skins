@@ -18,12 +18,11 @@ import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots
 import type { ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
 import type { CatalogSkin, SkinRuntimeStore } from './runtime/boot.ts'
 import type { SkinBackgroundHandle } from './background.ts'
-import type { WallpaperHandle } from './wallpaper.ts'
+import type { ExternalWallpaperHandle } from './external-wallpaper-handle.ts'
 import type { PreviewCoordinator } from './preview-coordinator.ts'
 import type { CustomThemeController } from './custom-theme-controller.ts'
-import { CoexistenceNotice } from './CoexistenceNotice.tsx'
+import { ExternalWallpaperNotice } from './ExternalWallpaperNotice.tsx'
 import { CustomThemeCard } from './CustomThemePanel.tsx'
-import { WallpaperPanel } from './WallpaperPanel.tsx'
 import { SliderControl } from './SliderControl.tsx'
 import css from './skin-center.module.css'
 
@@ -38,9 +37,9 @@ export interface SkinCenterInjected {
   }
   /** Background occluder over the shared skin-background namespace. */
   background: SkinBackgroundHandle
-  /** Wallpaper Engine bridge over the skin-wallpaper namespace. */
-  wallpaper: WallpaperHandle
-  /** One serialized preview session shared by skins and wallpapers. */
+  /** The delegated Wallpaper Engine plugin this card points at (issue #39). */
+  externalWallpaper: ExternalWallpaperHandle
+  /** One serialized preview session shared by skins, wallpapers and themes. */
   preview: PreviewCoordinator
   /** User palette derived from the official stock theme. */
   customTheme: CustomThemeController
@@ -72,7 +71,7 @@ function useLiveValue(value: number): [number, (v: number | null) => void] {
  * @param props - card props.
  * @returns the plugin card.
  */
-export function SkinCenter({ t, runtime, theme, background, wallpaper, preview, customTheme }: SkinCenterComponentProps) {
+export function SkinCenter({ t, runtime, theme, background, externalWallpaper, preview, customTheme }: SkinCenterComponentProps) {
   const snapshot = useSyncExternalStore((listener) => theme.subscribe(listener), () => theme.getTheme())
   const enabled = useSyncExternalStore(background.subscribe, background.enabled)
   const opacity = useSyncExternalStore(background.subscribe, background.opacity)
@@ -179,9 +178,10 @@ export function SkinCenter({ t, runtime, theme, background, wallpaper, preview, 
   }
 
   const restoreOfficialLook = async (): Promise<string | null> => {
-    const active = await switchAndDeactivateCustomTheme(null, null)
-    if (wallpaper.selection() !== '') wallpaper.clearSelection()
-    return active
+    // The delegated wallpaper plugin owns its own selection, so restoring the
+    // stock skin never touches it (issue #39): the skin center only manages
+    // skins, the wallpaper keeps rendering behind them.
+    return await switchAndDeactivateCustomTheme(null, null)
   }
 
   /**
@@ -200,11 +200,7 @@ export function SkinCenter({ t, runtime, theme, background, wallpaper, preview, 
       setError(t('applyFailed'))
       return
     }
-    run(target, () => preview.runSkin(async () => {
-      const active = await switchAndDeactivateCustomTheme(target, entry)
-      if (wallpaper.selection() !== '') wallpaper.clearSelection()
-      return active
-    }))
+    run(target, () => preview.runSkin(() => switchAndDeactivateCustomTheme(target, entry)))
   }
 
   const tryOnCustomTheme = (): void => {
@@ -402,7 +398,13 @@ export function SkinCenter({ t, runtime, theme, background, wallpaper, preview, 
       </div>
 
       <div className={css.cardBody}>
-            <CoexistenceNotice t={t} />
+            <ExternalWallpaperNotice t={t} />
+            {state.stoodDown && (
+              <div className={css.externalWallpaperNotice} role="status">
+                <div className={css.externalWallpaperTitle}>{t('stoodDownTitle')}</div>
+                <p className={css.externalWallpaperBody}>{t('stoodDownBody')}</p>
+              </div>
+            )}
             <div className={css.enableRow}>
               <span className={css.enableLabel} title={t('enabled')}>{t('enabled')}</span>
               <button
@@ -582,7 +584,6 @@ export function SkinCenter({ t, runtime, theme, background, wallpaper, preview, 
                     <p className={css.backgroundHint}>{t('bubbleBlurHint')}</p>
                   </div>
 
-                  <WallpaperPanel t={t} wallpaper={wallpaper} />
 
                   {error !== null && <div className={css.error}>{error}</div>}
 
@@ -714,7 +715,7 @@ export type SkinCenterSectionProps =
 
 /** Render the skin-center card as a first-level settings page. */
 export function SkinCenterSection(props: SkinCenterSectionProps): ReactNode {
-  const { t, runtime, theme, background, wallpaper, preview, customTheme } = props
+  const { t, runtime, theme, background, externalWallpaper, preview, customTheme } = props
   return (
     <ul className={css.sectionList}>
       <SkinCenter
@@ -722,7 +723,7 @@ export function SkinCenterSection(props: SkinCenterSectionProps): ReactNode {
         runtime={runtime}
         theme={theme}
         background={background}
-        wallpaper={wallpaper}
+        externalWallpaper={externalWallpaper}
         preview={preview}
         customTheme={customTheme}
       />

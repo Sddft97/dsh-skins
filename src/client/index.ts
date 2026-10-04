@@ -33,7 +33,9 @@ import { SkinCenterSection, type SkinCenterInjected } from './SkinCenter.tsx'
 import { BackgroundController, SKIN_BACKGROUND_NS } from './background.ts'
 import type { SkinBackgroundConfig } from '../core/background.ts'
 import { initialSkinBackgroundReconcileState, reconcileSkinBackgroundPublication } from '../core/background-scope.ts'
-import { SKIN_WALLPAPER_NS, WallpaperController, installBootRestore, mapDirPickResult, type WallpaperSection } from './wallpaper.ts'
+import { externalWallpaperEngineActive, watchExternalWallpaperEngine } from './runtime/external-wallpaper-engine.ts'
+import { setComposerFrostSuppressed } from './runtime/backdrop-scene.ts'
+import { EXTERNAL_WE_PLUGIN, EXTERNAL_WE_REPO } from '../external-wallpaper.ts'
 import { en, zh, type SkinCenterKey } from './locales.ts'
 import { bootSkinRuntime, watchPersistedSelection } from './runtime/boot.ts'
 import { PreviewCoordinator } from './preview-coordinator.ts'
@@ -84,7 +86,6 @@ declare module '@deepseek-ai/cordis' {
 interface SkinCenterSettings {
   'skin-background'?: SkinBackgroundConfig
   'skin-custom-theme'?: CustomThemeConfig
-  'skin-wallpaper'?: WallpaperSection
 }
 
 /**
@@ -112,30 +113,16 @@ function bindConfigForm(ctx: ClientContext): ConfigForm<SkinCenterSettings> {
 }
 
 /**
- * Required services: slots + locale (plugin card), theme (preview toggle),
- * configForms (settings sections), and the Remote faces the wallpaper feature
- * calls.
+ * Required services: slots + locale (plugin card), theme (preview toggle) and
+ * configForms (settings sections).
  *
- * `remote.directoryPicker` is named explicitly because a generated Remote
- * namespace is its own Cordis service (`remote.<namespace>`), NOT a property
- * of `remote`: `ctx.remote.x` is only readable while `remote.x` is injected,
- * otherwise cordis' context proxy throws
- * `cannot get property "remote.x" without inject`. `connection` owns the
- * carrier the namespace service rides on, so it is required first.
- *
- * The skin center is mounted inside the dsh-web-all aggregate, whose client
- * children bring their own nested fiber; naming the namespace here parks this
- * plugin until the picker namespace is really mounted, which is what makes
- * `pickDir` available on a Host that serves it (and keeps the browse button
- * off a deployment that does not).
- *
- * Both composed backends register the same namespace, so the namespace's
- * presence says nothing about which interaction the Host serves: a native
- * backend opens the OS chooser, a browse backend refuses `pick` and serves
- * listing primitives instead. The panel decides on the answer, not on
- * presence (see WallpaperPanel's folder browser).
+ * The Remote faces this plugin used (the wallpaper panel's folder picker)
+ * left with the built-in Wallpaper Engine bridge: wallpaper configuration now
+ * belongs to `dsh-plugin-wallpaper-engine`, which owns its own directory
+ * pickers. Dropping the `remote.directoryPicker` inject also releases the
+ * parking it imposed, so the card mounts on a Host that serves no picker.
  */
-export const inject = ['slots', 'locale', 'theme', 'configForms', 'connection', 'remote', 'remote.directoryPicker']
+export const inject = ['slots', 'locale', 'theme', 'configForms']
 
 /** Self-report item for the install heartbeat. */
 const SELF_ITEM = [{ name: '@linxin666/dsh-client-ui-skin-center' }]
@@ -280,22 +267,25 @@ export function apply(ctx: ClientContext): void {
     settingsSection<CustomThemeConfig>(settings, SKIN_CUSTOM_THEME_NS),
   )
   ctx.effect(() => () => customTheme.dispose(), 'ui-skin-center: custom theme dispose')
-  // The Wallpaper Engine bridge over the skin-wallpaper section.
-  const wallpaper = new WallpaperController(
-    settingsSection<WallpaperSection>(settings, SKIN_WALLPAPER_NS),
-  )
-  ctx.effect(() => () => wallpaper.dispose(), 'ui-skin-center: wallpaper dispose')
-  // Mount the persisted wallpaper selection at boot (page load), so a
-  // selection survives reloads without first opening the skin-center card.
-  installBootRestore(wallpaper)
+  // The external Wallpaper Engine plugin owns wallpapers now (issue #39).
+  // While it renders one, its `body[data-we-wallpaper]` marker stands this
+  // plugin's own visual work down ENTIRELY: no skin CSS, no background art, no
+  // hooks, no composer frost. That plugin rewrites the same shell and paints
+  // its own glass, so anything this one paints would fight it.
+  //
+  // The state is read synchronously BEFORE the runtime boots, so a page that
+  // loads with a wallpaper already rendering never paints a frame of skin
+  // first. The watcher installed below then keeps it current.
+  let externalWallpaperActive = externalWallpaperEngineActive(document)
+  const externalWallpaperListeners = new Set<() => void>()
 
   // The v2 skin runtime store: outlives the settings card so a try-on
-  // preview survives closing and reopening the panel. Background-media
-  // priority: an active WE wallpaper suppresses skin manifest backgrounds;
-  // toggling the wallpaper re-activates the current skin so the priority
-  // flip paints immediately.
+  // preview survives closing and reopening the panel. An active external
+  // wallpaper withholds the skin; a marker flip re-applies the user's
+  // selection so the appearance changes without a reload.
   const runtime = bootSkinRuntime({
-    suppressBackgroundMedia: () => wallpaper.enabled() && wallpaper.isDisplaying(),
+    suppressSkin: () => externalWallpaperActive,
+    suppressComposerFrost: () => externalWallpaperActive,
   })
   ctx.effect(() => () => runtime.shutdown(), 'ui-skin-center: runtime shutdown')
   // Applying a skin and saving the choice are one action in the GUI, but the
@@ -305,15 +295,20 @@ export function apply(ctx: ClientContext): void {
   // Host applies without telling this page). Issue #1740 owned by this
   // activation, so a cleared plugin row takes the listeners with it.
   ctx.effect(() => watchPersistedSelection(runtime), 'ui-skin-center: follow the persisted selection')
-  ctx.effect(
-    () => wallpaper.subscribe(() => { void runtime.controller.refresh() }),
-    'ui-skin-center: wallpaper priority refresh',
-  )
-  const preview = new PreviewCoordinator(runtime.controller, wallpaper, customTheme)
-  ctx.effect(
-    () => ctx.on('theme/change', () => wallpaper.recoverScenePlayer()),
-    'ui-skin-center: scene recovery after theme change',
-  )
+  // Follow the external plugin's marker: every flip notifies the card (so its
+  // hints stay truthful) and re-applies the current skin, which is what paints
+  // or withholds it without a reload. The first report carries the state the
+  // boot above already used, so it is a no-op.
+  ctx.effect(() => watchExternalWallpaperEngine(document, (active) => {
+    if (active === externalWallpaperActive) return
+    externalWallpaperActive = active
+    // The external plugin paints its own composer glass, so this runtime
+    // yields the frost while the wallpaper renders (issue #39).
+    setComposerFrostSuppressed(document, active)
+    for (const listener of externalWallpaperListeners) listener()
+    void runtime.controller.refresh()
+  }), 'ui-skin-center: external wallpaper engine interop')
+  const preview = new PreviewCoordinator(runtime.controller, customTheme)
   const injected = (): SkinCenterInjected => ({
     runtime,
     preview,
@@ -341,46 +336,14 @@ export function apply(ctx: ClientContext): void {
       setBubbleBlur: value => background.setBubbleBlur(value),
       dispose: () => background.dispose(),
     },
-    wallpaper: {
-      enabled: () => wallpaper.enabled(),
-      selection: () => wallpaper.selection(),
-      mode: () => wallpaper.mode(),
-      fit: () => wallpaper.fit(),
-      dim: () => wallpaper.dim(),
-      wallpaperBlur: () => wallpaper.wallpaperBlur(),
-      wallpaperOpacity: () => wallpaper.wallpaperOpacity(),
-      pauseOnHidden: () => wallpaper.pauseOnHidden(),
-      sound: () => wallpaper.sound(),
-      volume: () => wallpaper.volume(),
-      dirs: () => wallpaper.dirs(),
-      addDir: dir => wallpaper.addDir(dir),
-      removeDir: dir => wallpaper.removeDir(dir),
-      pickDir: async () => mapDirPickResult(await ctx.remote.directoryPicker.pick()),
-      listDir: async (path?: string) => {
-        const result = await ctx.remote.directoryPicker.list(path)
-        if (!result.ok) throw new Error(result.error.message)
-        return result.value
+    externalWallpaper: {
+      active: () => externalWallpaperActive,
+      subscribe: (listener) => {
+        externalWallpaperListeners.add(listener)
+        return () => { externalWallpaperListeners.delete(listener) }
       },
-      activeId: () => wallpaper.activeId(),
-      trying: () => wallpaper.trying(),
-      writeError: () => wallpaper.writeError(),
-      subscribe: listener => wallpaper.subscribe(listener),
-      setEnabled: value => wallpaper.setEnabled(value),
-      setMode: value => wallpaper.setMode(value),
-      setFit: fit => wallpaper.setFit(fit),
-      setDim: value => wallpaper.setDim(value),
-      setBlur: value => wallpaper.setBlur(value),
-      setOpacity: value => wallpaper.setOpacity(value),
-      setPauseOnHidden: value => wallpaper.setPauseOnHidden(value),
-      setSound: value => wallpaper.setSound(value),
-      setVolume: value => wallpaper.setVolume(value),
-      applySelection: descriptor => { void preview.runWallpaper(() => wallpaper.applySelection(descriptor)) },
-      clearSelection: () => wallpaper.clearSelection(),
-      sync: descriptor => wallpaper.sync(descriptor),
-      tryOn: descriptor => { void preview.runWallpaper(() => wallpaper.tryOn(descriptor)) },
-      exitTryOn: () => wallpaper.exitTryOn(),
-      recoverScenePlayer: () => wallpaper.recoverScenePlayer(),
-      dispose: () => wallpaper.dispose(),
+      repository: EXTERNAL_WE_REPO,
+      packageName: EXTERNAL_WE_PLUGIN,
     },
   })
 

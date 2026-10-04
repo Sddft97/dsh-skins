@@ -5,9 +5,13 @@
  * Keep that fallback scoped below sidebar.workspaces so an unrelated animation
  * or overlay whose class contains "fade" is never affected.
  *
- * The stylesheet is inert for the stock look: a catalog skin, custom theme or
- * wallpaper must be active. It is installed once per runtime and removed with
- * that runtime, so disabling the plugin restores the shell unchanged.
+ * The stylesheet is inert for the stock look: a catalog skin or a custom theme
+ * must be active. The wallpaper mode left this adapter with the built-in
+ * Wallpaper Engine bridge (issue #39): the delegated plugin owns the shell
+ * corrections for its own backdrop, and this plugin's visual work stands down
+ * entirely while that plugin renders. The sheet is installed once per runtime
+ * and removed with that runtime, so disabling the plugin restores the shell
+ * unchanged.
  * @module @linxin666/dsh-client-ui-skin-center/runtime/shell-rendering
  */
 
@@ -20,7 +24,6 @@ export const DEFAULT_COMPOSER_CLEARANCE_PX = 100
 const ACTIVE_VISUAL_SELECTOR = [
   'html[data-dsh-skin]',
   'html[data-dsh-custom-theme]:not([data-dsh-skin])',
-  'html[data-dsh-wallpaper-active]',
 ].join(', ')
 
 const COMPOSER_SEAT_SELECTORS = [

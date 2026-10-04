@@ -1,127 +1,159 @@
+/**
+ * Preview serialization (issue #39 migration round): the wallpaper dimension
+ * left with the built-in Wallpaper Engine bridge, so the coordinator now
+ * arbitrates exactly two — skins and the custom theme. These tests pin the
+ * orderings the card's try-on / exit / apply buttons rely on.
+ */
 import { describe, expect, it, vi } from 'vitest'
 import { PreviewCoordinator } from '../src/client/preview-coordinator.ts'
 
-describe('PreviewCoordinator', () => {
-  it('waits for a skin preview to exit before applying a wallpaper', async () => {
-    let release!: () => void
-    const exited = new Promise<void>(resolve => { release = resolve })
-    const calls: string[] = []
-    const skin = {
-      getState: () => ({ previewing: true }),
-      exitTryOn: vi.fn(async () => { calls.push('skin-exit-start'); await exited; calls.push('skin-exit-end'); return null }),
-    }
-    const wallpaper = { trying: () => false, exitTryOn: vi.fn() }
-    const coordinator = new PreviewCoordinator(skin, wallpaper)
-    const pending = coordinator.runWallpaper(() => { calls.push('wallpaper-apply') })
-    await Promise.resolve()
-    expect(calls).toEqual(['skin-exit-start'])
-    release()
-    await pending
-    expect(calls).toEqual(['skin-exit-start', 'skin-exit-end', 'wallpaper-apply'])
-  })
+/** A skin seat whose preview state the test drives. */
+function skinSeat(previewing = false): {
+  seat: { getState: () => { previewing: boolean }; exitTryOn: () => Promise<string | null> }
+  calls: string[]
+  setPreviewing: (value: boolean) => void
+} {
+  let state = previewing
+  const calls: string[] = []
+  return {
+    calls,
+    setPreviewing: (value) => { state = value },
+    seat: {
+      getState: () => ({ previewing: state }),
+      exitTryOn: vi.fn(async () => { state = false; calls.push('skin-exit'); return null }),
+    },
+  }
+}
 
-  it('retires the wallpaper preview before starting a skin transition', async () => {
-    const calls: string[] = []
-    const skin = { getState: () => ({ previewing: false }), exitTryOn: vi.fn(async () => null) }
-    const wallpaper = { trying: () => true, exitTryOn: vi.fn(() => { calls.push('wallpaper-exit') }) }
-    const coordinator = new PreviewCoordinator(skin, wallpaper)
-    await coordinator.runSkin(async () => { calls.push('skin-start'); return null })
-    expect(calls).toEqual(['wallpaper-exit', 'skin-start'])
-  })
-
-  it('serializes rapid cross-dimension actions in click order', async () => {
-    const calls: string[] = []
-    const skin = { getState: () => ({ previewing: false }), exitTryOn: vi.fn(async () => null) }
-    const wallpaper = { trying: () => false, exitTryOn: vi.fn() }
-    const coordinator = new PreviewCoordinator(skin, wallpaper)
-    const first = coordinator.runSkin(async () => { calls.push('skin'); return null })
-    const second = coordinator.runWallpaper(() => { calls.push('wallpaper') })
-    await Promise.all([first, second])
-    expect(calls).toEqual(['skin', 'wallpaper'])
-  })
-
-  it('suspends an applied custom theme for a skin preview and resumes it on exit', async () => {
-    const calls: string[] = []
-    let skinPreviewing = false
-    const skin = {
-      getState: () => ({ previewing: skinPreviewing }),
-      exitTryOn: async () => { skinPreviewing = false; calls.push('skin-exit'); return null },
-    }
-    const wallpaper = { trying: () => false, exitTryOn: () => {} }
-    const customTheme = {
-      getState: () => ({ previewing: false }),
-      exitTryOn: () => { calls.push('custom-exit') },
+/** A custom-theme seat recording its lifecycle calls. */
+function themeSeat(previewing = false): {
+  seat: { getState: () => { previewing: boolean }; exitTryOn: () => void; suspend: () => void; resume: () => void }
+  calls: string[]
+} {
+  let state = previewing
+  const calls: string[] = []
+  return {
+    calls,
+    seat: {
+      getState: () => ({ previewing: state }),
+      exitTryOn: () => { state = false; calls.push('custom-exit') },
       suspend: () => { calls.push('custom-suspend') },
       resume: () => { calls.push('custom-resume') },
-    }
-    const coordinator = new PreviewCoordinator(skin, wallpaper, customTheme)
+    },
+  }
+}
 
-    await coordinator.runSkin(async () => { skinPreviewing = true; calls.push('skin-preview'); return null })
+describe('PreviewCoordinator', () => {
+  it('suspends an applied custom theme for a skin preview and resumes it on exit', async () => {
+    // Given an applied theme and a skin seat that starts empty
+    const skin = skinSeat(false)
+    const theme = themeSeat(false)
+    const coordinator = new PreviewCoordinator(skin.seat, theme.seat)
+    // One shared trace: the seats push into it, so the ordering across both
+    // dimensions is what the assertions read.
+    const calls: string[] = []
+    const exitSkin = skin.seat.exitTryOn
+    skin.seat.exitTryOn = async () => { calls.push('skin-exit'); return await exitSkin() }
+    const suspend = theme.seat.suspend
+    theme.seat.suspend = () => { calls.push('custom-suspend'); suspend() }
+    const resume = theme.seat.resume
+    theme.seat.resume = () => { calls.push('custom-resume'); resume() }
+
+    // When a skin is previewed and then exited
+    await coordinator.runSkin(async () => { skin.setPreviewing(true); calls.push('skin-preview'); return null })
     expect(calls).toEqual(['custom-suspend', 'skin-preview'])
 
-    await coordinator.runSkin(() => skin.exitTryOn())
-    expect(calls).toEqual(['custom-suspend', 'skin-preview', 'custom-suspend', 'skin-exit', 'custom-resume'])
+    calls.length = 0
+    await coordinator.runSkin(() => skin.seat.exitTryOn())
+
+    // Then the theme is suspended for the preview and resumed once it ends
+    expect(calls).toEqual(['custom-suspend', 'skin-exit', 'custom-resume'])
   })
 
-  it('fully retires a custom-theme preview before starting a wallpaper preview', async () => {
+  it('retires a live custom-theme preview before starting a skin transition', async () => {
+    // Given a custom theme being tried on
+    const skin = skinSeat(false)
+    const theme = themeSeat(true)
+    const coordinator = new PreviewCoordinator(skin.seat, theme.seat)
     const calls: string[] = []
-    let skinPreviewing = true
-    const skin = {
-      getState: () => ({ previewing: skinPreviewing }),
-      exitTryOn: async () => { skinPreviewing = false; calls.push('skin-exit'); return null },
-    }
-    const wallpaper = { trying: () => false, exitTryOn: () => {} }
-    const customTheme = {
-      getState: () => ({ previewing: true }),
-      exitTryOn: () => { calls.push('custom-exit') },
-      suspend: () => { calls.push('custom-suspend') },
-      resume: () => { calls.push('custom-resume') },
-    }
-    const coordinator = new PreviewCoordinator(skin, wallpaper, customTheme)
+    const originalExit = theme.seat.exitTryOn
+    theme.seat.exitTryOn = () => { originalExit(); calls.push('custom-exit') }
 
-    await coordinator.runWallpaper(() => { calls.push('wallpaper-preview') })
+    // When a skin transition runs
+    await coordinator.runSkin(async () => { calls.push('skin-start'); return null })
 
-    expect(calls).toEqual(['custom-exit', 'skin-exit', 'custom-resume', 'wallpaper-preview'])
+    // Then the theme preview is retired first, so the two never overlap
+    expect(calls).toEqual(['custom-exit', 'skin-start'])
   })
 
-  it('retires skin and wallpaper previews before starting a custom-theme action', async () => {
+  it('retires a skin preview before starting a custom-theme action', async () => {
+    // Given a skin being tried on and no theme preview
+    const skin = skinSeat(true)
+    const theme = themeSeat(false)
+    const coordinator = new PreviewCoordinator(skin.seat, theme.seat)
     const calls: string[] = []
-    let skinPreviewing = true
-    const skin = {
-      getState: () => ({ previewing: skinPreviewing }),
-      exitTryOn: async () => { skinPreviewing = false; calls.push('skin-exit'); return null },
-    }
-    const wallpaper = { trying: () => true, exitTryOn: () => { calls.push('wallpaper-exit') } }
-    const customTheme = {
-      getState: () => ({ previewing: false }),
-      exitTryOn: () => { calls.push('custom-exit') },
-      suspend: () => { calls.push('custom-suspend') },
-      resume: () => { calls.push('custom-resume') },
-    }
-    const coordinator = new PreviewCoordinator(skin, wallpaper, customTheme)
+    const originalExit = skin.seat.exitTryOn
+    skin.seat.exitTryOn = async () => { calls.push('skin-exit'); return await originalExit() }
 
+    // When a custom-theme action runs
     await coordinator.runCustomTheme(async () => { calls.push('custom-preview'); return null })
 
-    expect(calls).toEqual(['wallpaper-exit', 'skin-exit', 'custom-resume', 'custom-preview'])
+    // Then the skin preview is exited first
+    expect(calls).toEqual(['skin-exit', 'custom-preview'])
   })
 
   it('commits an existing custom-theme preview without restoring the underlying skin first', async () => {
+    // Given a skin preview under a custom-theme preview
+    const skin = skinSeat(true)
+    const theme = themeSeat(true)
+    const coordinator = new PreviewCoordinator(skin.seat, theme.seat)
     const calls: string[] = []
-    const skin = {
-      getState: () => ({ previewing: true }),
-      exitTryOn: async () => { calls.push('skin-exit'); return null },
-    }
-    const wallpaper = { trying: () => false, exitTryOn: () => {} }
-    const customTheme = {
-      getState: () => ({ previewing: true }),
-      exitTryOn: () => { calls.push('custom-exit') },
-      suspend: () => {},
-      resume: () => { calls.push('custom-resume') },
-    }
-    const coordinator = new PreviewCoordinator(skin, wallpaper, customTheme)
+    const originalExit = skin.seat.exitTryOn
+    skin.seat.exitTryOn = async () => { calls.push('skin-exit'); return await originalExit() }
 
+    // When the custom theme is applied
     await coordinator.runCustomTheme(async () => { calls.push('custom-apply'); return null })
 
-    expect(calls).toEqual(['custom-resume', 'custom-apply'])
+    // Then the already-live theme preview is committed in place: exiting the
+    // skin preview would flash the stock look under the applied theme
+    expect(calls).toEqual(['custom-apply'])
+  })
+
+  it('serializes rapid cross-dimension actions in click order', async () => {
+    // Given a coordinator with nothing previewing
+    const skin = skinSeat(false)
+    const theme = themeSeat(false)
+    const coordinator = new PreviewCoordinator(skin.seat, theme.seat)
+    const calls: string[] = []
+
+    // When two actions are requested back to back
+    const first = coordinator.runSkin(async () => { calls.push('skin'); return null })
+    const second = coordinator.runCustomTheme(async () => { calls.push('theme'); return null })
+    await Promise.all([first, second])
+
+    // Then they run one at a time, in click order
+    expect(calls).toEqual(['skin', 'theme'])
+  })
+
+  it('runs a skin action after a slow theme transition has fully settled', async () => {
+    // Given a theme action that is still in flight
+    const skin = skinSeat(false)
+    const theme = themeSeat(false)
+    const coordinator = new PreviewCoordinator(skin.seat, theme.seat)
+    const calls: string[] = []
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+
+    const pending = coordinator.runCustomTheme(async () => { calls.push('theme-start'); await gate; calls.push('theme-end'); return null })
+    const queued = coordinator.runSkin(async () => { calls.push('skin'); return null })
+    await Promise.resolve()
+
+    // When the theme action finishes
+    expect(calls).toEqual(['theme-start'])
+    release()
+    await Promise.all([pending, queued])
+
+    // Then the skin action runs only after it completed
+    expect(calls).toEqual(['theme-start', 'theme-end', 'skin'])
   })
 })

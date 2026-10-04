@@ -5,18 +5,16 @@
  * declares volatile. These tests pin what the browser half depends on — the
  * fields and defaults the removed per-namespace registration declared, the
  * volatility of every field the card or the settings page writes, and the
- * live references the runtime reads an edit through.
+ * live references the runtime reads an edit through. The wallpaper section
+ * retired with the built-in Wallpaper Engine bridge (issue #39).
  */
 import { describe, expect, it } from 'vitest'
 import {
   Config,
   SKIN_BACKGROUND_NAMESPACE,
   SKIN_CUSTOM_THEME_NAMESPACE,
-  SKIN_WALLPAPER_NAMESPACE,
   SkinBackgroundConfigSchema,
   SkinCustomThemeConfigSchema,
-  SkinWallpaperConfigSchema,
-  defaultWallpaperEnabled,
 } from '../src/index.ts'
 import { SKIN_BACKGROUND_DEFAULTS, type SkinBackgroundConfig } from '../src/core/background.ts'
 import { CUSTOM_THEME_DEFAULTS, CUSTOM_THEME_VERSION } from '../src/core/custom-theme.ts'
@@ -77,11 +75,12 @@ describe('skin-center host config', () => {
     // Given the plugin's own configuration schema, which the Host serves as
     // this profile entry's settings page
     // When the entry's sections are read
-    // Then they are the three preference families the card owns
+    // Then they are the two preference families the card owns: the wallpaper
+    // family left with the built-in Wallpaper Engine bridge (issue #39), which
+    // is now `dsh-plugin-wallpaper-engine`'s own configuration
     expect(Object.keys(Config.dict ?? {})).toEqual([
       SKIN_BACKGROUND_NAMESPACE,
       SKIN_CUSTOM_THEME_NAMESPACE,
-      SKIN_WALLPAPER_NAMESPACE,
     ])
   })
 
@@ -94,37 +93,18 @@ describe('skin-center host config', () => {
     expect(resolved).toEqual(SKIN_BACKGROUND_DEFAULTS)
   })
 
-  it('user gets the wallpaper section defaults, sound fields included', () => {
-    // Given a profile row that never touched the wallpaper settings
+  it('user keeps a retired wallpaper section in their profile without an error', () => {
+    // Given a profile written before the bridge moved out, carrying the
+    // `skin-wallpaper` section this package no longer declares (issue #39)
+    const stale = { 'skin-wallpaper': { selection: '1218076433', dim: 40 } }
+
     // When the Host resolves the entry
-    const resolved = plain(Config({})['skin-wallpaper'])
+    const resolved = plain(Config(stale as never)) as Record<string, unknown>
 
-    // Then every wallpaper field — including the sound toggle and volume the
-    // card persists — carries the value the previous namespace declared
-    expect(resolved).toEqual({
-      enabled: defaultWallpaperEnabled(),
-      weLibraryDirs: [],
-      selection: '',
-      mode: 'live',
-      pauseOnHidden: true,
-      dim: 25,
-      wallpaperBlur: 0,
-      wallpaperOpacity: 100,
-      fit: 'cover',
-      sound: false,
-      volume: 100,
-    })
-  })
-
-  it('wallpaper starts enabled only where a Wallpaper Engine library can exist', () => {
-    // Given Wallpaper Engine is a Windows application with no macOS build
-    // When the platform default is asked for each supported platform
-    // Then only macOS starts the feature off, so the user turns it on and
-    // picks a folder of videos (the macOS flow) instead of the feature
-    // silently scanning Apple's own wallpapers
-    expect(defaultWallpaperEnabled('win32')).toBe(true)
-    expect(defaultWallpaperEnabled('linux')).toBe(true)
-    expect(defaultWallpaperEnabled('darwin')).toBe(false)
+    // Then resolution succeeds and the current sections are unaffected, so an
+    // upgrade never breaks an existing profile over a retired section
+    expect(resolved[SKIN_BACKGROUND_NAMESPACE]).toEqual(SKIN_BACKGROUND_DEFAULTS)
+    expect(resolved[SKIN_CUSTOM_THEME_NAMESPACE]).toBeDefined()
   })
 
   it('user gets the custom-theme section resolved from the versioned contract', () => {
@@ -142,14 +122,15 @@ describe('skin-center host config', () => {
   })
 
   it('user keeps a per-field profile value while the section defaults fill the rest', () => {
-    // Given a profile row that selects a wallpaper and dims it
-    const resolved = plain(Config({ 'skin-wallpaper': { selection: '1218076433', dim: 40 } }))
+    // Given a profile row that overrides exactly one background field
+    const resolved = plain(Config({ 'skin-background': { backgroundOpacity: 40 } })) as {
+      'skin-background': SkinBackgroundConfig
+    }
 
     // When the Host resolves the entry
-    // Then the explicit fields win and the untouched ones keep their defaults
-    expect((resolved['skin-wallpaper'] as { selection: string }).selection).toBe('1218076433')
-    expect((resolved['skin-wallpaper'] as { dim: number }).dim).toBe(40)
-    expect((resolved['skin-wallpaper'] as { wallpaperOpacity: number }).wallpaperOpacity).toBe(100)
+    // Then the explicit field wins and the untouched ones keep their defaults
+    expect(resolved['skin-background'].backgroundOpacity).toBe(40)
+    expect(resolved['skin-background'].bubbleBlur).toBe(SKIN_BACKGROUND_DEFAULTS.bubbleBlur)
   })
 
   it('user gets every field of every section declared volatile', () => {
@@ -157,7 +138,7 @@ describe('skin-center host config', () => {
     // When each section's declared fields are inspected
     // Then every one of them is volatile, which is what puts it on the
     // generated settings page and lets its path accept a write
-    for (const section of [SKIN_BACKGROUND_NAMESPACE, SKIN_CUSTOM_THEME_NAMESPACE, SKIN_WALLPAPER_NAMESPACE]) {
+    for (const section of [SKIN_BACKGROUND_NAMESPACE, SKIN_CUSTOM_THEME_NAMESPACE]) {
       const fields = Object.keys(node([section])!.dict ?? {})
       expect(fields.length).toBeGreaterThan(0)
       const nonVolatile = fields.filter(field => node([section, field])?.meta?.volatile !== true)
@@ -172,10 +153,8 @@ describe('skin-center host config', () => {
       [SKIN_CUSTOM_THEME_NAMESPACE, 'applied'],
       [SKIN_CUSTOM_THEME_NAMESPACE, 'light'],
       [SKIN_CUSTOM_THEME_NAMESPACE, 'light', 'accent'],
-      [SKIN_WALLPAPER_NAMESPACE, 'selection'],
-      [SKIN_WALLPAPER_NAMESPACE, 'sound'],
-      [SKIN_WALLPAPER_NAMESPACE, 'weLibraryDirs'],
       [SKIN_BACKGROUND_NAMESPACE, 'enabled'],
+      [SKIN_BACKGROUND_NAMESPACE, 'backgroundOpacity'],
     ]
 
     // When each path is looked up in the schema
@@ -195,21 +174,19 @@ describe('skin-center host config', () => {
     // Then they are the same schemas, so no reader sees a second field set
     expect(Config.dict?.['skin-background']).toBe(SkinBackgroundConfigSchema)
     expect(Config.dict?.['skin-custom-theme']).toBe(SkinCustomThemeConfigSchema)
-    expect(Config.dict?.['skin-wallpaper']).toBe(SkinWallpaperConfigSchema)
   })
 
-  it('user gets a wallpaper edit the running activation reads without a remount', () => {
+  it('user gets a background edit the running activation reads without a remount', () => {
     // Given a validated config whose references a running activation holds
     const resolved = Config({})
-    const held = resolved['skin-wallpaper'].selection
-    expect(held.get()).toBe('')
+    const held = resolved['skin-background'].backgroundOpacity
+    expect(held.get()).toBe(SKIN_BACKGROUND_DEFAULTS.backgroundOpacity)
 
     // When the Host commits a settings write into that same reference (the
     // Loader's live update for a volatile field, not a row remount)
-    commit(held, Config({ 'skin-wallpaper': { selection: '1218076433' } })['skin-wallpaper'].selection.get())
+    commit(held, Config({ 'skin-background': { backgroundOpacity: 55 } })['skin-background'].backgroundOpacity.get())
 
-    // Then the activation's own reference reports the new selection, which is
-    // what the /we routes serve
-    expect(held.get()).toBe('1218076433')
+    // Then the activation's own reference reports the new value
+    expect(held.get()).toBe(55)
   })
 })
