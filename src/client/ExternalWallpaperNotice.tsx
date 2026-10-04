@@ -3,18 +3,31 @@
  *
  * Wallpaper support no longer ships inside the skin center: it is delegated to
  * `dsh-plugin-wallpaper-engine`. This card occupies the place the wallpaper
- * controls used to, so the feature stays discoverable where users expect it:
- * when the profile does not carry the plugin it names it, shows the install
- * command and links the plugin's repository; when it is present it states that
- * wallpapers are configured there and that an active wallpaper stands the
- * skin's own backdrop art down.
+ * controls used to, so the feature stays discoverable where users expect it.
+ * The plugin is a recommended Workshop item, so the card offers a ONE-CLICK
+ * INSTALL through whichever plugin-management face the host publishes
+ * (see external-wallpaper-install.ts) and falls back to the copy-command line
+ * when the host publishes none.
  *
- * The probe is read-only (see src/external-wallpaper.ts) and this component
- * renders nothing when the host does not answer it, so an older host never
+ * Three states, all driven by the read-only host probe
+ * (see src/external-wallpaper.ts):
+ *  - not installed, with a management face: the recommended badge plus an
+ *    Install button;
+ *  - not installed, no face: the copy-command fallback;
+ *  - installed: states that wallpapers are configured there, and that an
+ *    active wallpaper pauses this card's skin.
+ *
+ * Nothing renders when the probe cannot be reached, so an older host never
  * shows a false "not installed" prompt.
  */
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
+import {
+  getWallpaperInstallFaces,
+  installPluginSpec,
+  isInstallSpecValid,
+  subscribeWallpaperInstallFaces,
+} from './external-wallpaper-install.ts'
 import css from './skin-center.module.css'
 
 /** Host base path of the probe (mirrors src/routes-v2.ts). */
@@ -27,6 +40,8 @@ interface ExternalWallpaperPayload {
   packageName?: string
   repository?: string
   installCommand?: string
+  /** npm spec the one-click install hands to the plugin manager. */
+  npm?: string
 }
 
 /** The payload narrowed to what the pointer renders. */
@@ -35,6 +50,7 @@ interface ExternalWallpaperState {
   packageName: string
   repository: string
   installCommand: string
+  npm: string
 }
 
 /** Fallbacks used only when the host omits a field. */
@@ -42,6 +58,17 @@ const FALLBACK = {
   packageName: 'dsh-plugin-wallpaper-engine',
   repository: 'https://github.com/elysia395/dsh-wallpaper-engine',
   installCommand: 'dsh plugin --profile web add dsh-plugin-wallpaper-engine',
+  npm: 'dsh-plugin-wallpaper-engine',
+}
+
+/** The copyable command line, used when no management face is available. */
+async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -52,6 +79,10 @@ const FALLBACK = {
  */
 export function ExternalWallpaperNotice({ t }: { t: PropsLocale<'skinCenter'>['t'] }): ReactNode {
   const [state, setState] = useState<ExternalWallpaperState | null>(null)
+  const faces = useSyncExternalStore(subscribeWallpaperInstallFaces, getWallpaperInstallFaces)
+  const [installing, setInstalling] = useState(false)
+  const [notice, setNotice] = useState<'copied' | 'failed' | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -70,6 +101,7 @@ export function ExternalWallpaperNotice({ t }: { t: PropsLocale<'skinCenter'>['t
           installCommand: typeof payload.installCommand === 'string' && payload.installCommand !== ''
             ? payload.installCommand
             : FALLBACK.installCommand,
+          npm: typeof payload.npm === 'string' && payload.npm !== '' ? payload.npm : FALLBACK.npm,
         })
       })
       .catch(() => {
@@ -81,18 +113,68 @@ export function ExternalWallpaperNotice({ t }: { t: PropsLocale<'skinCenter'>['t
 
   if (state === null) return null
 
+  // A manager exists when either face is published; installPluginSpec itself
+  // prefers the official in-process manager.
+  const canInstall = faces.native !== null || faces.family !== null
+  const spec = state.npm
+
+  const onInstall = (): void => {
+    if (installing || !isInstallSpecValid(spec)) return
+    setInstalling(true)
+    setError(null)
+    setNotice(null)
+    const cryptoObj = typeof window === 'undefined' ? undefined : window.crypto
+    const requestId = cryptoObj && typeof cryptoObj.randomUUID === 'function'
+      ? cryptoObj.randomUUID()
+      : 'skin-center-wallpaper-' + spec
+    void installPluginSpec(spec, requestId).then((outcome) => {
+      // 'installed' needs no message: the probe re-reads on the next mount, and
+      // a host that hot-reloads the row reports the new plugin itself.
+      if (outcome.kind === 'failed') setError(outcome.message)
+    }).finally(() => { setInstalling(false) })
+  }
+
+  const onCopy = (): void => {
+    void copyText(state.installCommand).then((ok) => { setNotice(ok ? 'copied' : 'failed') })
+  }
+
   return (
     <div className={css.externalWallpaperNotice} role="status">
       <div className={css.externalWallpaperTitle}>
         {state.installed ? t('externalWallpaperReadyTitle') : t('externalWallpaperMissingTitle')}
       </div>
+      {!state.installed && (
+        <span className={css.externalWallpaperBadge}>{t('externalWallpaperRecommended')}</span>
+      )}
       <p className={css.externalWallpaperBody}>
         {state.installed
           ? t('externalWallpaperReadyBody')
           : t('externalWallpaperMissingBody', { package: state.packageName })}
       </p>
       {!state.installed && (
-        <code className={css.externalWallpaperCommand}>{state.installCommand}</code>
+        <div className={css.externalWallpaperActions}>
+          {canInstall && (
+            <button
+              type="button"
+              className={css.button + ' ' + css.buttonPrimary}
+              disabled={installing}
+              onClick={onInstall}
+            >
+              {installing ? t('externalWallpaperInstalling') : t('externalWallpaperInstall')}
+            </button>
+          )}
+          {!canInstall && (
+            <code className={css.externalWallpaperCommand}>{state.installCommand}</code>
+          )}
+          <button type="button" className={css.button} disabled={installing} onClick={onCopy}>
+            {notice === 'copied' ? t('externalWallpaperCopied') : t('externalWallpaperCopyCommand')}
+          </button>
+        </div>
+      )}
+      {error !== null && (
+        <p className={css.externalWallpaperError} role="alert">
+          {t('externalWallpaperInstallFailed', { reason: error })}
+        </p>
       )}
       <a
         className={css.externalWallpaperLink}

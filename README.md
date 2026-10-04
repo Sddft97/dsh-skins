@@ -67,13 +67,17 @@ skin-center is a self-contained bundle meeting the official DSH plugin standard 
 
 ## Wallpaper Engine
 
-Wallpaper Engine support is **not bundled** here. It lives in its own plugin, [dsh-wallpaper-engine](https://github.com/elysia395/dsh-wallpaper-engine) (`dsh-plugin-wallpaper-engine`), which owns the wallpaper library, the video / web / scene rendering paths, the wallpaper settings surface and the glass over the wallpaper.
+Wallpaper Engine support is **not bundled** here. It lives in its own plugin, [dsh-wallpaper-engine](https://github.com/elysia395/dsh-wallpaper-engine) (`dsh-plugin-wallpaper-engine`), which owns the wallpaper library, the video / web / scene rendering paths, the wallpaper settings surface and the glass over the wallpaper. It is the **recommended** Workshop item for wallpapers, and the skin center card installs it for you.
+
+**One-click install**: open 设置 → 皮肤中心 and press **Install** on the card's wallpaper notice. The install goes through whichever plugin-management face the running host publishes — the official in-process plugin manager when it is there (the same call the official Plugins page makes, and the only writer on the packaged Desktop client), otherwise the family plugin-manager face. A host that publishes neither keeps the copy-command fallback.
+
+By hand, the equivalent is:
 
 ```sh
 dsh plugin --profile web add dsh-plugin-wallpaper-engine
 ```
 
-Restart the host afterwards (`dsh web`; DSH Desktop: fully quit the app and reopen it). The plugin adds its own settings page for choosing and tuning wallpapers; the skin center card points at it when it is missing.
+Restart the host afterwards (`dsh web`; DSH Desktop: fully quit the app and reopen it). The plugin adds its own settings page for choosing and tuning wallpapers.
 
 ### How the two share the page
 
@@ -137,6 +141,7 @@ skins/skin-center/
   src/client/background.ts                  # scrim + blur controls
   src/external-wallpaper.ts                 # read-only probe of the delegated wallpaper plugin
   src/client/runtime/external-wallpaper-engine.ts   # stands skins down while that plugin renders
+  src/client/external-wallpaper-install.ts  # one-click install through the host's plugin-management face
   skins/<id>/                               # built-in skins (pure asset directories)
 ```
 
