@@ -13,6 +13,12 @@ export type SkinCenterKey =
   | 'externalWallpaperMissingTitle'
   | 'externalWallpaperMissingBody'
   | 'externalWallpaperLink'
+  | 'externalWallpaperRecommended'
+  | 'externalWallpaperInstall'
+  | 'externalWallpaperInstalling'
+  | 'externalWallpaperCopyCommand'
+  | 'externalWallpaperCopied'
+  | 'externalWallpaperInstallFailed'
   | 'stoodDownTitle'
   | 'stoodDownBody'
   | 'enabled'
@@ -146,6 +152,12 @@ export const en: Record<SkinCenterKey, string> = {
   externalWallpaperMissingTitle: 'Wallpaper Engine support moved to its own plugin',
   externalWallpaperMissingBody: 'This card no longer bundles a Wallpaper Engine bridge. To use Wallpaper Engine wallpapers, install {package} with the command below and restart dsh; it adds its own settings page for the wallpaper library, rendering and glass.',
   externalWallpaperLink: 'Open the wallpaper plugin docs',
+  externalWallpaperRecommended: 'Recommended',
+  externalWallpaperInstall: 'Install',
+  externalWallpaperInstalling: 'Installing...',
+  externalWallpaperCopyCommand: 'Copy command',
+  externalWallpaperCopied: 'Copied',
+  externalWallpaperInstallFailed: 'Install failed: {reason}',
   stoodDownTitle: 'Skin paused while the wallpaper is active',
   stoodDownBody: 'Your skin is still selected, but it is not painted while the wallpaper plugin renders a wallpaper: the two cannot share the backdrop. Stop the wallpaper there and the skin comes back on its own.',
   enabled: 'Enable skin center',
@@ -280,6 +292,12 @@ export const zh: Record<SkinCenterKey, string> = {
   externalWallpaperMissingTitle: 'Wallpaper Engine 支持已独立成插件',
   externalWallpaperMissingBody: '本卡片不再自带 Wallpaper Engine 桥。要使用 Wallpaper Engine 壁纸，请用下面的命令安装 {package} 并重启 dsh；它自带壁纸库、渲染与玻璃的设置页。',
   externalWallpaperLink: '打开壁纸插件文档',
+  externalWallpaperRecommended: '推荐',
+  externalWallpaperInstall: '一键安装',
+  externalWallpaperInstalling: '安装中…',
+  externalWallpaperCopyCommand: '复制命令',
+  externalWallpaperCopied: '已复制',
+  externalWallpaperInstallFailed: '安装失败：{reason}',
   stoodDownTitle: '壁纸启用期间皮肤已暂停',
   stoodDownBody: '你选择的皮肤仍然保留，但在壁纸插件渲染壁纸期间不会绘制：两者的背景无法共存。在该插件里停止壁纸，皮肤会自动恢复。',
   enabled: '启用皮肤中心',

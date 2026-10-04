@@ -67,13 +67,17 @@ dsh plugin --profile web add @linxin666/dsh-client-ui-skin-center
 
 ## Wallpaper Engine
 
-Wallpaper Engine 支持**不再内置**在本包。它由独立插件 [dsh-wallpaper-engine](https://github.com/elysia395/dsh-wallpaper-engine)（`dsh-plugin-wallpaper-engine`）提供，壁纸库、视频 / 网页 / 场景三条渲染路径、壁纸设置面与壁纸之上的玻璃都归它管。
+Wallpaper Engine 支持**不再内置**在本包。它由独立插件 [dsh-wallpaper-engine](https://github.com/elysia395/dsh-wallpaper-engine)（`dsh-plugin-wallpaper-engine`）提供，壁纸库、视频 / 网页 / 场景三条渲染路径、壁纸设置面与壁纸之上的玻璃都归它管。它是壁纸方面的**推荐**工坊条目，皮肤中心卡片可直接帮你装上。
+
+**一键安装**：打开 设置 → 皮肤中心，在卡片的壁纸提示条上点「一键安装」。安装走宿主当前发布的插件管理面——存在官方进程内插件管理器时优先用它（与官方插件页同一个调用，也是打包版桌面客户端上唯一的写入者），否则退回家族插件管理器面；两者都没有时保留复制命令的兜底。
+
+手工等价命令：
 
 ```sh
 dsh plugin --profile web add dsh-plugin-wallpaper-engine
 ```
 
-装完重启宿主（`dsh web`；DSH Desktop 需完全退出应用后重新打开）。该插件自带设置页用于选择与调节壁纸；未安装时皮肤中心卡片会指向它。
+装完重启宿主（`dsh web`；DSH Desktop 需完全退出应用后重新打开）。该插件自带设置页用于选择与调节壁纸。
 
 ### 两者如何共处一页
 
@@ -137,6 +141,7 @@ skins/skin-center/
   src/client/background.ts                  # 遮罩 + 模糊控制
   src/external-wallpaper.ts                 # 只读探测独立壁纸插件
   src/client/runtime/external-wallpaper-engine.ts   # 该插件渲染期间停画皮肤
+  src/client/external-wallpaper-install.ts  # 经宿主插件管理面一键安装
   skins/<id>/                               # 内置皮肤（纯资产目录）
 ```
 

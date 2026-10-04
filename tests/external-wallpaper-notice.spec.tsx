@@ -61,11 +61,34 @@ const REPORT = {
   packageName: 'dsh-plugin-wallpaper-engine',
   repository: 'https://github.com/elysia395/dsh-wallpaper-engine',
   installCommand: 'dsh plugin --profile web add dsh-plugin-wallpaper-engine',
+  npm: 'dsh-plugin-wallpaper-engine',
+}
+
+/** The Install button of the notice, if rendered. */
+function installButton(): HTMLButtonElement | null {
+  const buttons = Array.from(host.querySelectorAll('button'))
+  return (buttons.find((b) => b.textContent === zh.externalWallpaperInstall) ?? null) as HTMLButtonElement | null
+}
+
+/** A Stand-in set of install faces, published into the module store. */
+async function publishFaces(native?: unknown, family?: unknown): Promise<void> {
+  const { bridgeWallpaperInstallFaces } = await import('../src/client/external-wallpaper-install.ts')
+  bridgeWallpaperInstallFaces({
+    inject: (deps: string[], cb: (inner: unknown) => void) => {
+      const inner = {
+        get: (name: string) => (name === 'remote.pluginManager' ? native : family),
+        effect: (fn: () => () => void) => fn(),
+      }
+      for (const dep of deps) cb(inner)
+      return () => {}
+    },
+  } as never)
 }
 
 describe('ExternalWallpaperNotice', () => {
-  it('offers the install command and the docs link when the plugin is missing', async () => {
-    // Given a profile without the delegated plugin
+  it('offers the install command and the docs link when no manager is available', async () => {
+    // Given a profile without the delegated plugin and a host publishing no
+    // plugin-management face
     await render({ ...REPORT, installed: false, signals: [] })
 
     // When the pointer renders
@@ -75,6 +98,43 @@ describe('ExternalWallpaperNotice', () => {
     expect(host.textContent).toContain(REPORT.installCommand)
     const link = host.querySelector('a')
     expect(link?.getAttribute('href')).toBe(REPORT.repository)
+  })
+
+  it('marks the plugin recommended and offers one-click install when a manager exists', async () => {
+    // Given the host publishes the official in-process manager
+    const installBundle = vi.fn(async () => ({ ok: true, value: {} }))
+    await publishFaces({ installBundle })
+    await render({ ...REPORT, installed: false, signals: [] })
+
+    // When the notice renders
+    // Then it carries the recommended badge and a working Install button
+    expect(host.textContent).toContain(zh.externalWallpaperRecommended)
+    const button = installButton()
+    expect(button).not.toBeNull()
+    await act(async () => {
+      button!.click()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    // And the click reached the manager with the validated spec
+    expect(installBundle).toHaveBeenCalledTimes(1)
+    expect((installBundle.mock.calls[0] as unknown[])[0]).toBe('dsh-plugin-wallpaper-engine')
+    expect(host.textContent).toContain(zh.externalWallpaperInstall)
+  })
+
+  it('surfaces an install refusal instead of claiming success', async () => {
+    // Given a manager that refuses the spec
+    await publishFaces({ installBundle: vi.fn(async () => ({ ok: false, error: { message: 'peer range rejected' } })) })
+    await render({ ...REPORT, installed: false, signals: [] })
+
+    // When Install is clicked
+    await act(async () => {
+      installButton()!.click()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    // Then the reason is shown
+    expect(host.textContent).toContain('peer range rejected')
   })
 
   it('states the delegation and hides the command when the plugin is present', async () => {

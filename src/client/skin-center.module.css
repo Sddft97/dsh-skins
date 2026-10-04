@@ -68,9 +68,11 @@ body[data-dsh-skin-center] .cardBody {
   border-top: 1px solid var(--dsw-alias-border-l2);
 }
 
-/* Delegated wallpaper plugin pointer (issue #39): a read-only state notice, so
-   it rides the warning state tokens rather than the brand accent — nothing here
-   is interactive except the documentation link. */
+/* Delegated wallpaper plugin pointer (issue #39): a state notice that carries
+   the recommended plugin's one-click install. It rides the warning state tokens
+   rather than the brand accent, so it reads as a callout next to the skin list;
+   the primary button uses the sanctioned primary-button triple (the brand token
+   doubles as a foreground in the official themes and would paint dark on dark). */
 body[data-dsh-skin-center] .externalWallpaperNotice {
   display: flex;
   flex-direction: column;
@@ -87,11 +89,38 @@ body[data-dsh-skin-center] .externalWallpaperTitle {
   color: var(--dsw-alias-state-warning-primary, #b06000);
 }
 
+/* The recommended marker: a quiet pill beside the title. */
+body[data-dsh-skin-center] .externalWallpaperBadge {
+  align-self: flex-start;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--dsw-alias-brand-primary, #1e63b8);
+  background: var(--dsw-alias-bg-layer-3);
+  border: 1px solid var(--dsw-alias-border-l2);
+}
+
 body[data-dsh-skin-center] .externalWallpaperBody {
   margin: 0;
   font-size: 12px;
   line-height: 1.5;
   color: var(--dsw-alias-label-secondary, #6b7280);
+}
+
+/* The action row wraps, so a narrow card stacks the command above its buttons. */
+body[data-dsh-skin-center] .externalWallpaperActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+body[data-dsh-skin-center] .externalWallpaperError {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dsw-alias-state-danger, #c53030);
 }
 
 /* The install command: a copyable one-liner, so it reads as data, not prose. */

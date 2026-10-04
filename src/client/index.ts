@@ -35,6 +35,7 @@ import type { SkinBackgroundConfig } from '../core/background.ts'
 import { initialSkinBackgroundReconcileState, reconcileSkinBackgroundPublication } from '../core/background-scope.ts'
 import { externalWallpaperEngineActive, watchExternalWallpaperEngine } from './runtime/external-wallpaper-engine.ts'
 import { setComposerFrostSuppressed } from './runtime/backdrop-scene.ts'
+import { bridgeWallpaperInstallFaces } from './external-wallpaper-install.ts'
 import { EXTERNAL_WE_PLUGIN, EXTERNAL_WE_REPO } from '../external-wallpaper.ts'
 import { en, zh, type SkinCenterKey } from './locales.ts'
 import { bootSkinRuntime, watchPersistedSelection } from './runtime/boot.ts'
@@ -267,6 +268,10 @@ export function apply(ctx: ClientContext): void {
     settingsSection<CustomThemeConfig>(settings, SKIN_CUSTOM_THEME_NS),
   )
   ctx.effect(() => () => customTheme.dispose(), 'ui-skin-center: custom theme dispose')
+  // One-click install of the delegated plugin (issue #39): bridge whichever
+  // plugin-management face the host publishes. Both are optional, so neither
+  // gates this plugin's activation.
+  bridgeWallpaperInstallFaces(ctx)
   // The external Wallpaper Engine plugin owns wallpapers now (issue #39).
   // While it renders one, its `body[data-we-wallpaper]` marker stands this
   // plugin's own visual work down ENTIRELY: no skin CSS, no background art, no

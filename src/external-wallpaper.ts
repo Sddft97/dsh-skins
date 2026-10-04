@@ -54,6 +54,8 @@ export interface ExternalWallpaperReport {
   repository: string
   /** The exact install command to show the user. */
   installCommand: string
+  /** The npm package spec the card hands to the plugin manager. */
+  npm: string
 }
 
 /** Signal names, stable enough to assert on and to log. */
@@ -201,5 +203,8 @@ export function detectExternalWallpaperEngine(
     packageName: EXTERNAL_WE_PLUGIN,
     repository: EXTERNAL_WE_REPO,
     installCommand: EXTERNAL_WE_INSTALL_COMMAND,
+    // The registry name and the install spec are the same string for this
+    // package; it stays its own field so a pinned dist-tag can diverge later.
+    npm: EXTERNAL_WE_PLUGIN,
   }
 }
