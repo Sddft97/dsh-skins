@@ -540,6 +540,49 @@ describe('skin controller', () => {
     expect(controller.active).toBe('media-skin')
   })
 
+  it('a hanging persist does not hold the page on a paint the wallpaper already superseded (#1805)', async () => {
+    document.head.innerHTML = ''
+    document.body.innerHTML = ''
+    document.documentElement.removeAttribute('data-dsh-skin')
+    const ledger = createEffectLedger()
+    const loadStylesheet = async (href: string) => {
+      const link = document.createElement('link')
+      link.rel = 'stylesheet'
+      link.href = href
+      document.head.appendChild(link)
+    }
+    // A paired desktop's POST /active has no timeout: the write may never come
+    // back while the page is already painted.
+    let releasePersist!: () => void
+    const pendingPersist = new Promise<void>((resolve) => { releasePersist = resolve })
+    let suppressed = false
+    const controller = createSkinController({
+      doc: document,
+      ledger,
+      loadStylesheet,
+      persist: () => pendingPersist,
+      suppressSkin: () => suppressed,
+    })
+
+    // Given a switch whose persist call hangs after the skin is already painted
+    const applied = controller.switchTo('media-skin', entryFor('media-skin'))
+    await vi.waitFor(() => { expect(document.documentElement.getAttribute('data-dsh-skin')).toBe('media-skin') })
+
+    // When the wallpaper starts while that write is still outstanding
+    suppressed = true
+    await controller.refresh()
+
+    // Then the skin yields immediately instead of waiting for the write
+    expect(controller.getState().stoodDown).toBe(true)
+    expect(document.documentElement.hasAttribute('data-dsh-skin')).toBe(false)
+
+    // And the switch itself still resolves once the write returns
+    releasePersist()
+    await applied
+    expect(controller.active).toBe('media-skin')
+    expect(controller.getState().stoodDown).toBe(true)
+  })
+
   it('an external wallpaper withholds the whole skin and gives it back when it stops (issue #39)', async () => {
     document.head.innerHTML = ''
     document.body.innerHTML = ''

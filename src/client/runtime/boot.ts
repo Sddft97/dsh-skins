@@ -266,19 +266,26 @@ async function fetchPersistedSelection(store: SkinRuntimeStore): Promise<string 
 
 /**
  * Read the persisted selection for a follower that may converge on it:
- * undefined while a switch is in flight.
+ * undefined while a switch is in flight, before AND after the read.
  *
  * A switch in flight owns the page's activation, and converging on a selection
  * read during that window supersedes it (that follower switch opens a newer
  * request). The desktop client boots exactly that way - no tapIndex stamp, so
  * its selection arrives from GET /active while the wallpaper watcher is
  * already publishing - and the follower would strand the page on the boot
- * activation's stale paint (issue #1805). The read is not lost: the next poll
- * sees the same value once the switch has settled.
+ * activation's stale paint (issue #1805).
+ *
+ * The check brackets the request on both sides because a switch can start while
+ * the GET is in flight: the value this read returns is then already older than
+ * the page's activation, and converging on it would supersede that switch. The
+ * read is not lost either way - the next poll sees the same value once the
+ * switch has settled.
  */
 async function readPersistedSelection(store: SkinRuntimeStore): Promise<string | null | undefined> {
   if (store.controller.isSwitching()) return undefined
-  return await fetchPersistedSelection(store)
+  const selection = await fetchPersistedSelection(store)
+  if (store.controller.isSwitching()) return undefined
+  return selection
 }
 
 /**

@@ -423,6 +423,12 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
       }
       emit()
       if (previous !== null) ledger.disposeActivation(previous)
+      // The paint has changed and the previous activation is retired: this is
+      // the point an external verdict flip must be able to take over.
+      // Persisting is a separate, unscheduled round-trip (POST /active can hang
+      // on a paired desktop) and must not hold the page on a superseded paint
+      // (issue #1805).
+      settleSwitch(seq)
       if (shouldPersist) {
         await persist(id).catch((error) => onError('failed to persist the skin selection', error))
       }
@@ -440,19 +446,37 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
       onError(`switch to ${id ?? 'stock'} failed; previous skin intact`, error)
       return active
     } finally {
-      // Only the newest switch clears the flag: an older one settling late must
-      // not report an in-flight newer switch as settled (issue #1805).
-      if (seq === latestRequest) {
-        switching = false
-        // A verdict flip that arrived while this switch was loading: it sampled
-        // its verdict before the flip, so replay the flip now that nothing is
-        // in flight. Dropping it would leave the page on a paint the external
-        // owner already superseded (issue #39 handoff, issue #1805).
-        if (refreshQueued) {
-          refreshQueued = false
-          void refresh()
-        }
-      }
+      // Safety net for the paths that bail before the atomic cut (a stale
+      // switch, or a failed stylesheet load). The normal path already settled
+      // before persisting, so this is a no-op there.
+      settleSwitch(seq)
+    }
+  }
+
+  /**
+   * The visual half of a switch is done: release the in-flight flag and replay
+   * a verdict flip that arrived while it was loading.
+   *
+   * Called at the atomic cut, NOT after the persist round-trip. POST /active
+   * has no timeout and can hang on a paired desktop, and a page that has
+   * already painted must still yield to an external owner the moment that
+   * owner's verdict flips - waiting for the write would leave the skin painted
+   * over the wallpaper (issue #1805). Idempotent, so the failure paths can
+   * call it again from the switch's `finally`.
+   */
+  function settleSwitch(seq: number): void {
+    // An older switch settling late must not report an in-flight newer switch
+    // as settled (issue #1805).
+    if (seq !== latestRequest) return
+    if (!switching && !refreshQueued) return
+    switching = false
+    // A verdict flip that arrived while this switch was loading: it sampled its
+    // verdict before the flip, so replay the flip now that nothing is in
+    // flight. Dropping it would leave the page on a paint the external owner
+    // already superseded (issue #39 handoff, issue #1805).
+    if (refreshQueued) {
+      refreshQueued = false
+      void refresh()
     }
   }
 

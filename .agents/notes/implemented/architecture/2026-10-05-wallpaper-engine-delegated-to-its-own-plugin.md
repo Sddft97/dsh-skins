@@ -135,8 +135,14 @@ The controller now tracks the in-flight switch (`isSwitching()`) and:
 - defers a verdict flip observed mid-switch, replaying it once the newest switch
   settles (the flip is not dropped: the in-flight activation sampled its verdict
   before it);
-- the selection follower reads nothing while a switch is in flight, so a poll
-  cannot supersede the activation that boot is still establishing.
+- the selection follower reads nothing while a switch is in flight, checking on
+  both sides of the GET, so a poll cannot supersede the activation that boot is
+  still establishing (a switch that starts while the GET is in flight would
+  otherwise be superseded by the returning value, which is older than it);
+- the in-flight flag is released at the atomic cut, not after the persist
+  round-trip: `POST /active` has no timeout and can hang on a paired desktop,
+  and a page that already painted must still yield the moment the external
+  owner's verdict flips.
 
 `watchPersistedSelection` keeps following a selection changed by another page,
 which is what it is for; the boot window is closed by the two rules above rather
