@@ -61,6 +61,52 @@ describe('miku hooks: custom cursors', () => {
   })
 })
 
+describe('miku hooks: window-chrome geometry', () => {
+  // The skin center loads patches.css with its failure swallowed
+  // (loadStylesheet(patchesHref).catch(() => {})) and then runs installHooks
+  // regardless, so the injected bars can exist with no stylesheet at all.
+  // Without fixed positioning they become the last flow blocks of <body> and
+  // push the document past the viewport, making the whole interface scroll.
+  it('injects fixed positioning for the bars so a missing patches.css cannot unpin them', () => {
+    const { ctx, runCleanup } = setup()
+    defineSkinHooks().apply(ctx)
+
+    const style = document.head.querySelector('style[data-dsh-skin-chrome]') as HTMLStyleElement | null
+    expect(style).not.toBeNull()
+    const css = style!.textContent ?? ''
+    expect(css).toContain('html[data-dsh-skin="miku"]')
+    for (const [selector, anchor] of [
+      ['.NPtzYa_mikuTitlebar', 'top: 0;'],
+      ['.NPtzYa_mikuStatusbar', 'bottom: 0;'],
+    ]) {
+      const rule = css.slice(css.indexOf(selector))
+      expect(rule).toContain('position: fixed;')
+      expect(rule.slice(0, rule.indexOf('}'))).toContain(anchor)
+    }
+    expect(css).toContain('z-index: 1000000;')
+
+    runCleanup()
+    expect(document.head.querySelector('style[data-dsh-skin-chrome]')).toBeNull()
+  })
+
+  // Guards the coupling itself: the sheet hard-codes the css-modules class
+  // names, so a rename in CLS would otherwise leave the bars unstyled again.
+  it('styles exactly the class names the hook mounts', () => {
+    const { ctx, runCleanup } = setup()
+    defineSkinHooks().apply(ctx)
+
+    const css = document.head.querySelector('style[data-dsh-skin-chrome]')!.textContent ?? ''
+    for (const part of ['titlebar', 'statusbar'] as const) {
+      const bar = document.body.querySelector(`[data-skin-chrome='${part}']`)
+      expect(bar).not.toBeNull()
+      expect(css).toContain(`.${bar!.className} {`)
+    }
+
+    runCleanup()
+    expect(document.querySelector('[data-skin-chrome]')).toBeNull()
+  })
+})
+
 describe('miku hooks: collapse handling', () => {
   it('toggles body[data-dsh-aionui-collapsed] from a collapsed aionui root', () => {
     const { ctx, runCleanup } = setup()
