@@ -3,7 +3,7 @@
   "skinManifestVersion": 2,
   "id": "model-dorm",
   "name": "居家模型娘",
-  "nameEn": "居家模型娘",
+  "nameEn": "Home Model Girls",
   "version": "0.1.0",
   "author": "Daizhdd",
   "tagline": "夕阳下的大模型群像 · 暖紫褐玻璃界面 · 奶油金与赭石点缀",
@@ -43,5 +43,7 @@
   "preview": {
     "light": "preview/light.jpg",
     "dark": "preview/dark.jpg"
-  }
+  },
+  "license": "MIT",
+  "licenseUrl": "https://github.com/zhu1090093659/dsh-skins/blob/main/skins/model-dorm/LICENSE"
 }
