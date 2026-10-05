@@ -143,6 +143,19 @@ export type SkinCenterKey =
   | 'repair'
   | 'repairing'
   | 'repaired'
+  | 'updateAll'
+  | 'updateAllChecking'
+  | 'updateAllRunning'
+  | 'updateAllNone'
+  | 'updateAllDone'
+  | 'updateAllFailed'
+  | 'uninstallAll'
+  | 'uninstallAllConfirm'
+  | 'uninstallAllRunning'
+  | 'uninstallAllDone'
+  | 'uninstallAllFailed'
+  | 'marketUnreachable'
+  | 'bulkNoUserSkins'
 
 export const en: Record<SkinCenterKey, string> = {
   title: 'Skin Center',
@@ -279,6 +292,19 @@ export const en: Record<SkinCenterKey, string> = {
   confirm: 'Confirm',
   verifyRepaired: 'Successfully repaired {count} skin(s) with integrity issues',
   verifyRepairFailed: 'Failed to repair {count} skin(s)',
+  updateAll: 'Update all',
+  updateAllChecking: 'Checking versions…',
+  updateAllRunning: 'Updating {done}/{total}…',
+  updateAllNone: 'All installed skins are up to date',
+  updateAllDone: 'Updated {count} skin(s)',
+  updateAllFailed: '{count} skin(s) failed to update',
+  uninstallAll: 'Uninstall all',
+  uninstallAllConfirm: 'Uninstall all {count} market-installed skin(s)? Their local files are deleted permanently and the GUI returns to the default look.',
+  uninstallAllRunning: 'Uninstalling {done}/{total}…',
+  uninstallAllDone: 'Uninstalled {count} skin(s)',
+  uninstallAllFailed: '{count} skin(s) failed to uninstall',
+  marketUnreachable: 'Could not reach the skin market to read versions',
+  bulkNoUserSkins: 'No market-installed skins to act on',
   repair: 'Repair',
   repairing: 'Repairing…',
   repaired: 'Repaired',
@@ -413,6 +439,19 @@ export const zh: Record<SkinCenterKey, string> = {
   verifyFoundIssues: '发现 {count} 款皮肤存在完整性异常',
   verifyRepaired: '已自动修复 {count} 款皮肤的完整性异常',
   verifyRepairFailed: '{count} 款皮肤自动修复失败',
+  updateAll: '全部更新',
+  updateAllChecking: '正在检查版本…',
+  updateAllRunning: '正在更新 {done}/{total}…',
+  updateAllNone: '所有已安装皮肤均为最新版本',
+  updateAllDone: '已更新 {count} 款皮肤',
+  updateAllFailed: '{count} 款皮肤更新失败',
+  uninstallAll: '全部卸载',
+  uninstallAllConfirm: '确定要卸载全部 {count} 款市场安装的皮肤吗？本地文件将被永久删除，界面回到默认外观。',
+  uninstallAllRunning: '正在卸载 {done}/{total}…',
+  uninstallAllDone: '已卸载 {count} 款皮肤',
+  uninstallAllFailed: '{count} 款皮肤卸载失败',
+  marketUnreachable: '无法连接皮肤市场以读取版本',
+  bulkNoUserSkins: '没有可操作的市场安装皮肤',
   repair: '修复',
   repairing: '修复中…',
   repaired: '已修复',

@@ -432,6 +432,16 @@ body[data-dsh-skin-center] .toolbar {
   margin: 4px 0 2px;
 }
 
+/* The bulk maintenance actions travel together: the toolbar spreads its
+   own children with space-between, so a bare third and fourth button would be
+   flung to the far edges instead of sitting beside "Verify integrity". */
+body[data-dsh-skin-center] .actionRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 body[data-dsh-skin-center] .verifySummary {
   font-size: 12px;
   line-height: 1.4;

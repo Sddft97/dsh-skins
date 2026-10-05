@@ -30,6 +30,7 @@ import { dirname, extname, join } from 'node:path'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 
 import { writeJson, requireSameOrigin } from './http-utils.ts'
+import { fetchMarketVersions, planVersionRows } from './bulk.ts'
 import { readJsonBody } from './http.ts'
 import { defaultActiveStatePath, readActiveState, writeActiveState } from './active-state.ts'
 import { sanitizeSkinBackground, type SkinBackgroundConfig } from './core/background.ts'
@@ -161,6 +162,27 @@ export function makeSkinCenterV2Routes(deps: RoutesV2Deps = {}): WebRoute[] {
             : 'npm',
         })),
       diagnostics: catalog.diagnostics,
+    })
+  }
+
+  // Version report for the bulk buttons. Read-only and origin-agnostic: it
+  // only pairs the installed catalog against the public market manifest, so it
+  // needs no same-origin fence. A market that cannot be read answers 200 with
+  // a null rows array and an error string, which is what lets the card say
+  // "market unreachable" instead of "everything is current".
+  const versionsHandler: WebRoute['handler'] = async (_req, res) => {
+    const catalog = loadCatalog()
+    const { versions, error } = await fetchMarketVersions({ fetchImpl: deps.fetchImpl })
+    if (error !== null) {
+      writeJson(res, 200, { ok: false, error, rows: [] })
+      return
+    }
+    const rows = planVersionRows(catalog, versions)
+    writeJson(res, 200, {
+      ok: true,
+      rows,
+      outdated: rows.filter((row) => row.outdated).length,
+      total: rows.length,
     })
   }
 
@@ -369,6 +391,7 @@ export function makeSkinCenterV2Routes(deps: RoutesV2Deps = {}): WebRoute[] {
     { kind: 'exact', path: `${SKIN_CENTER_V2_PREFIX}/catalog`, handler: catalogHandler },
     { kind: 'exact', path: `${SKIN_CENTER_V2_PREFIX}/external-wallpaper`, handler: externalWallpaperHandler },
     { kind: 'exact', path: `${SKIN_CENTER_V2_PREFIX}/verify`, handler: verifyHandler },
+    { kind: 'exact', path: `${SKIN_CENTER_V2_PREFIX}/skins/versions`, handler: versionsHandler },
     { kind: 'prefix', path: skinPrefix.replace(/\/$/, ''), handler: skinsHandler },
     { kind: 'exact', path: `${SKIN_CENTER_V2_PREFIX}/active`, handler: (req, res) => {
       if (req.method === 'GET') return activeGetHandler(req, res)

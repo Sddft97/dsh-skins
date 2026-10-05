@@ -108,6 +108,12 @@ export function SkinCenter({ t, runtime, theme, background, externalWallpaper, p
   const [verifyReports, setVerifyReports] = useState<Record<string, { status: string; hooksTrusted: boolean; mismatches: string[]; missing: string[] }>>({})
   const [confirmUninstallId, setConfirmUninstallId] = useState<string | null>(null)
   const [uninstallingId, setUninstallingId] = useState<string | null>(null)
+  // Bulk maintenance (update all / uninstall all). The two buttons drive the
+  // existing per-skin repair and uninstall routes one id at a time rather than
+  // adding a second mutating endpoint: the report route is the only new
+  // surface, and every write still goes through the individually tested path.
+  const [bulk, setBulk] = useState<{ phase: 'idle' | 'checking' | 'updating' | 'uninstalling'; done: number; total: number; failed: number; note: string } | null>(null)
+  const [uninstallAllArmed, setUninstallAllArmed] = useState(false)
   // Unmount guard: once the card is gone, pending async completions must not
   // setState (the controller itself owns the skin state and lives on).
   const mounted = useRef(false)
@@ -289,6 +295,111 @@ export function SkinCenter({ t, runtime, theme, background, externalWallpaper, p
     }
   }
 
+  /** Repair every installed skin the market publishes a newer release of. */
+  const handleUpdateAll = async (): Promise<void> => {
+    setError(null)
+    setBulk({ phase: 'checking', done: 0, total: 0, failed: 0, note: '' })
+    let targets: string[]
+    try {
+      const res = await fetch('/api/skin-center/v2/skins/versions', { cache: 'no-store' })
+      const json = (await res.json().catch(() => null)) as {
+        ok?: boolean
+        rows?: Array<{ id: string; outdated: boolean }>
+      } | null
+      if (!res.ok || json?.ok !== true || !Array.isArray(json.rows)) {
+        throw new Error('versions-unavailable')
+      }
+      targets = json.rows.filter((row) => row.outdated).map((row) => row.id)
+    } catch {
+      if (mounted.current) {
+        setBulk(null)
+        setError(t('marketUnreachable'))
+      }
+      return
+    }
+    if (!mounted.current) return
+    if (targets.length === 0) {
+      setBulk({ phase: 'idle', done: 0, total: 0, failed: 0, note: t('updateAllNone') })
+      return
+    }
+    let done = 0
+    let failed = 0
+    for (const id of targets) {
+      setBulk({ phase: 'updating', done, total: targets.length, failed, note: '' })
+      try {
+        const res = await fetch(`/api/skin-center/v2/skins/${encodeURIComponent(id)}/repair`, { method: 'POST' })
+        if (!res.ok) failed++
+      } catch {
+        failed++
+      }
+      done++
+    }
+    await runtime.refreshCatalog()
+    if (!mounted.current) return
+    if (activeId !== null) {
+      const freshEntry = runtime.find(activeId)
+      if (freshEntry) {
+        await preview.runSkin(() => switchAndDeactivateCustomTheme(activeId, freshEntry))
+      }
+    }
+    setBulk({
+      phase: 'idle',
+      done,
+      total: targets.length,
+      failed,
+      note: failed === 0 ? t('updateAllDone', { count: done }) : t('updateAllFailed', { count: failed }),
+    })
+  }
+
+  /**
+   * Uninstall every market-installed skin, including the active one. Builtins
+   * are never touched: they ship inside the package and are replaced by
+   * upgrading it. The first tap only arms the button, matching the per-skin
+   * uninstall affordance, because this cannot be undone.
+   */
+  const handleUninstallAll = async (): Promise<void> => {
+    const targets = (catalog ?? []).filter((skin) => skin.origin === 'user')
+    if (!uninstallAllArmed) {
+      if (targets.length === 0) {
+        setBulk({ phase: 'idle', done: 0, total: 0, failed: 0, note: t('bulkNoUserSkins') })
+        return
+      }
+      setUninstallAllArmed(true)
+      return
+    }
+    setUninstallAllArmed(false)
+    setError(null)
+    const wasActive = activeId
+    const wasTrying = tryingId
+    if (wasTrying !== null && targets.some((skin) => skin.manifest.id === wasTrying)) {
+      await preview.runSkin(() => runtime.controller.exitTryOn())
+    }
+    let done = 0
+    let failed = 0
+    for (const skin of targets) {
+      setBulk({ phase: 'uninstalling', done, total: targets.length, failed, note: '' })
+      try {
+        const res = await fetch(`/api/skin-center/v2/skins/${encodeURIComponent(skin.manifest.id)}/uninstall`, { method: 'POST' })
+        if (!res.ok) failed++
+      } catch {
+        failed++
+      }
+      done++
+    }
+    await runtime.refreshCatalog()
+    if (wasActive !== null && targets.some((skin) => skin.manifest.id === wasActive)) {
+      await preview.runSkin(restoreOfficialLook)
+    }
+    if (!mounted.current) return
+    setBulk({
+      phase: 'idle',
+      done,
+      total: targets.length,
+      failed,
+      note: failed === 0 ? t('uninstallAllDone', { count: done }) : t('uninstallAllFailed', { count: failed }),
+    })
+  }
+
   const handleUninstall = async (entry: CatalogSkin): Promise<void> => {
     const id = entry.manifest.id
     setUninstallingId(id)
@@ -453,6 +564,7 @@ export function SkinCenter({ t, runtime, theme, background, externalWallpaper, p
                           {t('themeDark')}
                         </button>
                       </div>
+                      <div className={css.actionRow}>
                       <button
                         type="button"
                         className={css.themeButton}
@@ -461,7 +573,37 @@ export function SkinCenter({ t, runtime, theme, background, externalWallpaper, p
                       >
                         {verifying ? t('verifyingIntegrity') : t('verifyIntegrity')}
                       </button>
+                      <button
+                        type="button"
+                        className={css.themeButton}
+                        disabled={bulk !== null && bulk.phase !== 'idle' || verifying || busyId !== null || uninstallingId !== null}
+                        onClick={() => { void handleUpdateAll() }}
+                      >
+                        {bulk?.phase === 'checking'
+                          ? t('updateAllChecking')
+                          : bulk?.phase === 'updating'
+                          ? t('updateAllRunning', { done: bulk.done, total: bulk.total })
+                          : t('updateAll')}
+                      </button>
+                      <button
+                        type="button"
+                        className={`${css.themeButton} ${uninstallAllArmed ? css.buttonDangerConfirm : css.buttonDanger}`}
+                        disabled={bulk !== null && bulk.phase !== 'idle' || verifying || busyId !== null || uninstallingId !== null}
+                        onClick={() => { void handleUninstallAll() }}
+                      >
+                        {bulk?.phase === 'uninstalling'
+                          ? t('uninstallAllRunning', { done: bulk.done, total: bulk.total })
+                          : uninstallAllArmed
+                          ? t('confirm')
+                          : t('uninstallAll')}
+                      </button>
+                      </div>
                     </div>
+                    {bulk !== null && bulk.note !== '' && (
+                      <div className={bulk.failed > 0 ? css.verifySummaryWarning : css.verifySummarySuccess}>
+                        {bulk.note}
+                      </div>
+                    )}
                     {verifySummary !== null && (
                       <div className={`${css.verifySummary} ${verifySummary.issues === 0 ? css.verifySummarySuccess : css.verifySummaryWarning}`}>
                         {verifySummary.repaired && verifySummary.repaired.length > 0 && verifySummary.issues === 0
