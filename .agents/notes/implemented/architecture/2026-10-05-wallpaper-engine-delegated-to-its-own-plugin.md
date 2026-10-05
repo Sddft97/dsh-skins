@@ -215,6 +215,27 @@ no `html[data-dsh-skin]` stamp and no skin stylesheet row, so the document
 reaches the browser as the stock look. It is read per render and only when a
 skin is actually applied, so the stock-look path pays nothing.
 
+**Withholding the document is only half of it, and the half that is easy to
+miss.** The browser half boots asynchronously: with no stamp to read, it
+recovers the selection from `GET /active` and activates it, so the first
+activation after the host declined to deliver a skin is precisely the switch
+that paints a frame of skin back into the gap - a few hundred milliseconds
+later, which is the same flash, moved rather than removed. Withholding only
+the document therefore trades a first-paint flash for a boot flash.
+
+So the host also marks what it withheld: `data-dsh-wallpaper-expected` on
+`<html>` (`src/core/wallpaper-handoff.ts`, shared by both halves). The
+browser reads it synchronously before the runtime boots and stands that first
+activation down for as long as it stands. The mark is a PREDICTION, never a
+verdict, and it is released by whichever answers first - the peer's marker
+(either direction; its first report already is an answer) or
+`PREDICTED_WALLPAPER_GRACE_MS`, the same bounded window the user-initiated
+claim uses above. Expiry is the safety property: a wallpaper that never
+renders never stamps the marker, and without the expiry that user would sit on
+the stock look until the next reload. When the window closes the ordinary
+withheld path applies the remembered selection, so the recovery needs no
+special case.
+
 The rules that keep this from becoming a second source of truth:
 
 - **the marker stays the verdict.** The runtime still decides on
@@ -231,7 +252,11 @@ The rules that keep this from becoming a second source of truth:
   it, and the dependency keeps pointing one way;
 - **the probe is optional on the adapter.** `readWallpaperOnStage` defaults to
   "no wallpaper", so a caller that does not wire it keeps today's document
-  exactly.
+  exactly;
+- **the prediction is bounded and self-clearing.** It is released by the
+  peer's marker or by its own expiry, whichever comes first, and the attribute
+  is this package's own - the host stamped it, only this package reads it -
+  so clearing it never touches the peer's contract.
 
 Rejected: a declaration line the peer injects into the index HTML
 (`<meta name="we-wallpaper-active">`) for this side's tap to string-match.

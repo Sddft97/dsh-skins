@@ -21,6 +21,7 @@ import type { IndexInjection } from '@deepseek-ai/dsh-host-webserver'
 import { findSkin, loadSkinCatalog } from './skin-repo.ts'
 import type { SkinCatalog } from './skin-repo.ts'
 import { SKIN_CENTER_V2_PREFIX } from './routes-v2.ts'
+import { WALLPAPER_EXPECTED_ATTR } from './core/wallpaper-handoff.ts'
 
 export interface SkinIndexTapDeps {
   readActiveId: () => string | null
@@ -44,6 +45,33 @@ export interface SkinIndexTapDeps {
 const HTML_TAG = /<html(\s[^>]*)?>/i
 const HEAD_CLOSE = /<\/head>/i
 const SKIN_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+
+/** Stamp or replace an attribute on the <html> tag. */
+function stampHtmlAttribute(html: string, name: string, value: string): string {
+  return html.replace(HTML_TAG, (match, attrs: string | undefined) => {
+    const rest = attrs ?? ''
+    const quoted = ` ${name}="${value}"`
+    if (new RegExp(`\\s${name}=`).test(rest)) {
+      return match.replace(new RegExp(`\\s${name}=("[^"]*"|'[^']*'|[^\\s>]+)`), quoted)
+    }
+    return `<html${rest}${quoted}>`
+  })
+}
+
+/**
+ * Mark a document as withheld for a PREDICTED wallpaper (issue #51).
+ *
+ * The withheld document alone is not enough: the browser half boots
+ * asynchronously and recovers the selection from GET /active, so without this
+ * mark its first activation would paint the very frame the host declined to
+ * deliver. The mark is what tells that switch to stand down, and the browser
+ * half releases it once the peer's marker answers.
+ * @param html - the document about to be served.
+ * @returns the document with the prediction attribute on <html>.
+ */
+export function stampWallpaperExpected(html: string): string {
+  return stampHtmlAttribute(html, WALLPAPER_EXPECTED_ATTR, '')
+}
 
 /** Stamp or replace data-dsh-skin on the <html> tag. */
 export function stampSkinAttribute(html: string, skinId: string): string {
@@ -129,8 +157,10 @@ export function makeSkinIndexTap(deps: SkinIndexTapDeps): (html: string) => stri
       // Same first-screen pre-judgment as the rows above (issue #51), on the
       // raw tap: it is the half that stamps the opening html tag, and a
       // document that reaches the browser already carrying a wallpaper must
-      // not reach it carrying the skin either.
-      if (wallpaperOnStage()) return html
+      // not reach it carrying the skin either. The document is marked as
+      // withheld-for-prediction so the browser half's boot activation stands
+      // down too, and releases that mark once the peer's marker answers.
+      if (wallpaperOnStage()) return stampWallpaperExpected(html)
       const catalog = loadCatalog()
       const entry = findSkin(catalog, active)
       if (!entry) {

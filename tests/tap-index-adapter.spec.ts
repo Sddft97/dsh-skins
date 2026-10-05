@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { makeSkinIndexRows, makeSkinIndexTap, skinLinkTags, stampSkinAttribute } from '../src/tap-index-adapter.ts'
+import { WALLPAPER_EXPECTED_ATTR } from '../src/core/wallpaper-handoff.ts'
 import type { SkinCatalog } from '../src/skin-repo.ts'
 
 const HTML = '<!doctype html><html lang="zh-CN"><head><title>dsh</title></head><body><div id="root"></div></body></html>'
@@ -207,9 +208,14 @@ describe('makeSkinIndexTap', () => {
     })
 
     // When the document is tapped
-    // Then it reaches the browser exactly as delivered: no stamp to scope the
-    // skin's CSS to, no stylesheet to paint a frame of skin with
-    expect(tap(HTML)).toBe(HTML)
+    // Then it carries no skin: no stamp to scope the skin's CSS to, no
+    // stylesheet to paint a frame of skin with
+    const out = tap(HTML)
+    expect(out).not.toContain('data-dsh-skin=')
+    expect(out).not.toContain('data-dsh-skin-link')
+    // And it is marked as withheld-for-prediction, so the browser half's boot
+    // activation stands down too instead of refilling the gap (#51)
+    expect(out).toContain(`${WALLPAPER_EXPECTED_ATTR}=""`)
   })
 
   it('stamps as before once the wallpaper is gone', () => {
