@@ -104,6 +104,62 @@ describe('maid-atelier hooks: character stage and decorative elements', () => {
     expect(document.body.style.getPropertyValue('--maid-top-trim-art')).toBe('')
   })
 
+  it('follows a macOS-style zero-width sidebar collapse instead of freezing at the default width', async () => {
+    // The macOS desktop host collapses the sidebar to a ZERO-width grid track
+    // (it keeps no icon rail there), and it announces that by flipping
+    // data-sidebar-collapsed on the frame. No sidebar subtree churn and no
+    // attribute the skin watched, so a width-only collapse used to leave
+    // --maid-sidebar-width at its 280px stylesheet default: the lace, the
+    // crest and the left maid all sat one sidebar-width to the right of the
+    // content, over an empty band where the sidebar used to be.
+    const { ctx, runCleanup } = setup()
+
+    const frame = document.createElement('div')
+    frame.className = 'ZTP-Xa_frame'
+    const column = document.createElement('div')
+    column.className = 'ZTP-Xa_sidebarCol'
+    column.appendChild(document.createElement('div'))
+    frame.appendChild(column)
+    document.body.appendChild(frame)
+
+    // jsdom reports no layout, so the column is given the width the measurement
+    // reads: the expanded track, then the collapsed zero-width track.
+    let columnWidth = 280
+    column.getBoundingClientRect = () => ({ width: columnWidth }) as DOMRect
+
+    // A ResizeObserver that never reports is the worst case this has to
+    // survive; the direct measurement must carry the value on its own.
+    const original = globalThis.ResizeObserver
+    globalThis.ResizeObserver = class {
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    } as unknown as typeof ResizeObserver
+
+    try {
+      defineSkinHooks().apply(ctx)
+      expect(document.body.style.getPropertyValue('--maid-sidebar-width')).toBe('280px')
+
+      columnWidth = 0
+      frame.setAttribute('data-sidebar-collapsed', '')
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      expect(document.body.style.getPropertyValue('--maid-sidebar-width')).toBe('0px')
+      expect(document.body.dataset.maidSidebarSize).toBe('rail')
+
+      columnWidth = 280
+      frame.removeAttribute('data-sidebar-collapsed')
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      expect(document.body.style.getPropertyValue('--maid-sidebar-width')).toBe('280px')
+      expect(document.body.dataset.maidSidebarSize).toBe('wide')
+    } finally {
+      globalThis.ResizeObserver = original
+      runCleanup()
+      frame.remove()
+    }
+  })
+
   it('mounts titlebar brand onto desktop frame element and positions it vertically centered in titlebar height (#1763)', () => {
     const frame = document.createElement('div')
     frame.className = 'ZTP-Xa_frame'

@@ -154,7 +154,11 @@ describe('maid-atelier plugin manager top-trim yield (#1742)', () => {
     const base = block('[data-skin-chrome="top-trim"]')
     expect(base).toContain('position: absolute')
     expect(base).toContain('height: 76px')
-    expect(base).toContain('translate: var(--maid-sidebar-width) 0')
+    // The offset carries the same 280px fallback as every other sidebar-width
+    // consumer in the file: without it an undefined custom property makes the
+    // whole translate declaration invalid at computed-value time, and the band
+    // would snap to the window edge instead of tracking the sidebar.
+    expect(base).toContain('translate: var(--maid-sidebar-width, 280px) 0')
     expect(base).not.toContain('display: none')
   })
 
