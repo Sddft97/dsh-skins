@@ -89,22 +89,43 @@ copyright record.**
   but names no character either, and `skin.json`'s `attribution` names the
   rights holder only for the engineering and the footage). The sibling
   `rainy-night` shows the expected shape: a "许可证与素材出处" table with a
-  `角色 —— 「鲸鱼娘」/ Whale Girl | 作者自有的角色线 | stushansusu` row. One
-  observation was recorded without blocking: the copy shipped since head
-  `72606304` is a codec-only H.264 transcode of a loop that is still a hard cut
-  at the seam (the contributor's own measurement: 171.06 against a p95
-  inter-frame delta of 8.70), and the earlier H.264 -> HEVC -> H.264 round trip
-  cost the delivery 1.92 MiB to the 25 MiB asset cap.
+  `角色 —— 「鲸鱼娘」/ Whale Girl | 作者自有的角色线 | stushansusu` row.
+  Three further record defects were named in the same comment, all one-line
+  fixes: `README.md`'s "Attribution and licence" section still carries the
+  previous head's provenance (DaVinci Resolve at :211-:212 against the ffmpeg
+  `Lavf61.1.100` the same file and the manifest now state, and a
+  `bake-sm-loop.py` claim at :216 against a shipped copy that is expressly not
+  baked); `README.zh.md:432` tells the reader to run
+  `node scripts/build-skin.mjs`, which exists in neither the head nor main;
+  and `skin.json`'s description says the brand row reads "水墨丹青" while
+  `patches.css:1831` draws "鲸鱼娘·水墨丹青".
+
+  Three observations were recorded without blocking. The loop is a hard cut at
+  the seam, on the contributor's own measurement (171.06 against a p95
+  inter-frame delta of 8.70), and the review did not move it from an
+  observation to a gate because the contributor discloses it and offers the
+  seamless bake (21.54 MB, seam 0.01, SSIM 0.9930). The evidence covers only
+  the ink phase: the submitted screenshot is at about t=20s while the first
+  4.5s of the 25.333s loop are the paper phase (18% of the running time), and
+  a local render of that phase through the declared scrim put panel-to-canvas
+  separation and the secondary-text pair below what the pull request reports,
+  with the sampling method - a mean over the content column rather than a
+  per-glyph probe - left open for the contributor to settle with a second
+  screenshot. The store asset is the crate zip, not the file: replaying
+  `scripts/market-build`'s `zipStore` over the eleven skin files gives about
+  24.70 MB against the 25 MiB cap, 1.44 MiB of headroom rather than the 1.92 MiB
+  the description derives from the video alone.
 
   The head moved three times inside the review, and the record keeps that.
   `25d22701` was an H.264 copy whose loop was closed by a self-crossfade
   (24,203,813 bytes, seam 0.02). `855644bb` replaced it with a zero-re-encode
   HEVC copy (21,942,809 bytes) whose loop point became a hard cut. `72606304`
-  transcoded that copy back to H.264 (24,204,601 bytes, 1.92 MiB under the
-  25 MiB asset cap) after the HEVC copy was found to render a single frame and
-  stop inside the shell. The review's own HEVC observation had rested on a
-  probe one Chromium major ahead of the shell's engine, and the shell's own
-  engine is what the contributor then tested against.
+  transcoded that copy back to H.264 (24,204,601 bytes) after the contributor
+  measured the HEVC copy rendering a single frame and stopping in the desktop
+  shell. The review's own HEVC observation had rested on a probe one Chromium
+  major ahead of the shell's engine, and the shell's own engine is what the
+  contributor then tested against; the review could not reproduce the shell's
+  behaviour itself and says so.
 
 ## Alternatives considered
 
@@ -129,8 +150,19 @@ copyright record.**
 - **Calling the HEVC copy unsupported from a local probe.** Rejected after the
   contributor's counter-evidence. The probe ran a Chromium one major ahead of
   the shell's engine and `canPlayType('video/mp4; codecs="hvc1"')` was empty
-  even there; the shell's own engine was the test that mattered, and on it the
-  HEVC copy rendered one frame and stopped.
+  even there, so it could not settle what the shell does; the contributor then
+  measured the shell itself and the HEVC copy rendered one frame and stopped.
+- **Moving the loop seam or the paper-phase coverage from an observation to a
+  gate.** Rejected. The contributor discloses the hard cut, explains it, and
+  offers a plausible seamless alternative, so the decision stays with them; the
+  paper-phase sample is this round's own approximation through the declared
+  scrim, and a gate cannot rest on a number the reviewer could not take the
+  same way twice.
+- **Treating the mid-review head changes as a reason to stop reviewing the
+  pull request.** Rejected. Each head was re-read at its own state, and the
+  final record names the head the conclusions belong to; the alternative -
+  reviewing a superseded diff - is what produced the round's only wrong
+  observation.
 - **Moving the dsh-web gitlinks for #29/#37 from this round.** Rejected at the
   time. #29 and #37 are content additions whose market landing the maintainer
   performs when publishing; #47/#48/#46 already had the domain owner's own
@@ -159,3 +191,10 @@ copyright record.**
   re-read at the head that is current when the decision is written, not at the
   one the review started from - and the same applies to a review's own
   observations, which have to name the engine they were measured on.
+- A third check came out of the same pull request: when a submission's
+  documentation is revised alongside its assets, the prose sections drift and
+  stop matching the shipped file, so the intake pass has to compare the
+  attribution and verification text against the manifest and the bytes, not
+  only check that the sections exist. Both the shipped archive size and the
+  attribution were wrong for the same reason - the file that was written first
+  was never re-read after the asset changed.
