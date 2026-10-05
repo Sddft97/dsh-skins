@@ -13,12 +13,15 @@ specific: the contributor-responsibility statement, the model attribution and
 the skin's own licence. #46 was a source change, so it needed a code review
 rather than the content gates. Two more source fixes, #47 (the app-body lift
 anchored on `#root`) and #48 (the blue-fantasy Windows whole-window frame),
-arrived during the round and were reviewed with the rest.
+arrived during the round and were reviewed with the rest. A third pass took a
+new content submission, #53 (shuimo-danqing / Whale Girl - Ink Wash, a
+dark-only video-background skin by stushansusu).
 
 ## Decision
 
 **All four submissions were merged across the round: #29 and #37 on the first
-pass, #42 and #46 after the requested changes came back.**
+pass, #42 and #46 after the requested changes came back. #53 is held on its
+copyright record.**
 
 - #29 (lucy-nightsignal) answered all three items from the 2026-10-03 round:
   the contributor-responsibility statement is now in `README.md`,
@@ -70,6 +73,29 @@ pass, #42 and #46 after the requested changes came back.**
   are approved on the record; the domain owner merged them as `118d5aa1` and
   `eb2acbef`, and the dsh-web gitlink bumps rode that owner's own landing PRs
   (#1808, #1809, #1810).
+- #53 (shuimo-danqing) passes the evidence and aesthetic gates and is held on
+  the copyright gate. Evidence: the two `evidence/` files and the skin's
+  `preview/` pair are one file, `sha256 06a80653...`, 132,368 bytes, and the
+  repository gates pass on head `855644bb` (`dsh-skin validate` PASS,
+  `skin-center:check` OK at 58 catalogue skins, 51 script tests green). The
+  aesthetic read on the real screenshot is a pass: the ink palette sits on the
+  painting without cutting into it, the sidebar rows and composer placeholder
+  keep their contrast, the character is not cropped or distorted, and the five
+  ink steps plus the single ink-green state colour carry the theme rather than
+  a flat recolour. The hold is the record: nothing in the skin directory names
+  the depicted character - "Whale Girl" / "鲸鱼娘" - its work or its rights
+  holder, and `README.zh.md` carries no attribution or licence section at all
+  (`README.md` has an "Attribution and licence" section but names no character
+  either, and `skin.json`'s `attribution` names the rights holder only for
+  the engineering and the footage). The sibling `rainy-night` shows the
+  expected shape: a "许可证与素材出处" table with a
+  `角色 —— 「鲸鱼娘」/ Whale Girl | 作者自有的角色线 | stushansusu` row. Two
+  observations were recorded without blocking: the zero-re-encode copy makes
+  the loop point a hard cut (the contributor's own measurement: 171.06 against
+  a p95 inter-frame delta of 8.71), and the background moved from H.264 to
+  HEVC (hvc1), which plays on the harness shell's Chromium 152 in the local
+  probe but reports an empty `canPlayType`, and which no other catalogue skin
+  uses.
 
 ## Alternatives considered
 
@@ -86,6 +112,11 @@ pass, #42 and #46 after the requested changes came back.**
   source/stylesheet fixes with no skin checklist to apply; they were reviewed
   against the code and their own specs, and their merge decision stays with the
   collaborator who owns that domain.
+- **Merging #53 because the structure, evidence and renders all pass.**
+  Rejected. The 2026-09-25 gate note requires the depicted character, its work
+  and its rights holder to be named in the tree; this submission names the
+  engineering and the footage but never the character, and a screenshot proves
+  the render, not the provenance.
 - **Moving the dsh-web gitlinks for #29/#37 from this round.** Rejected at the
   time. #29 and #37 are content additions whose market landing the maintainer
   performs when publishing; #47/#48/#46 already had the domain owner's own
@@ -106,3 +137,10 @@ pass, #42 and #46 after the requested changes came back.**
   action_required until someone with write access approves it; every first-time
   merge this round needed that approval before the required check could go
   green.
+- #53 stays open with the two record edits named; no gitlink moved for it, so
+  the catalogue and the market are unchanged by this pass.
+- A second reusable check came out of #53: a contributor can re-push a
+  materially different head (a re-encoded background, rewritten READMEs, a new
+  evidence screenshot) minutes after a review request, so the gates have to be
+  re-read at the head that is current when the decision is written, not at the
+  one the review started from.
