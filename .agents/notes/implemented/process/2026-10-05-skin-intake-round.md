@@ -74,28 +74,37 @@ copyright record.**
   `eb2acbef`, and the dsh-web gitlink bumps rode that owner's own landing PRs
   (#1808, #1809, #1810).
 - #53 (shuimo-danqing) passes the evidence and aesthetic gates and is held on
-  the copyright gate. Evidence: the two `evidence/` files and the skin's
-  `preview/` pair are one file, `sha256 06a80653...`, 132,368 bytes, and the
-  repository gates pass on head `855644bb` (`dsh-skin validate` PASS,
-  `skin-center:check` OK at 58 catalogue skins, 51 script tests green). The
-  aesthetic read on the real screenshot is a pass: the ink palette sits on the
-  painting without cutting into it, the sidebar rows and composer placeholder
-  keep their contrast, the character is not cropped or distorted, and the five
-  ink steps plus the single ink-green state colour carry the theme rather than
-  a flat recolour. The hold is the record: nothing in the skin directory names
-  the depicted character - "Whale Girl" / "鲸鱼娘" - its work or its rights
-  holder, and `README.zh.md` carries no attribution or licence section at all
-  (`README.md` has an "Attribution and licence" section but names no character
-  either, and `skin.json`'s `attribution` names the rights holder only for
-  the engineering and the footage). The sibling `rainy-night` shows the
-  expected shape: a "许可证与素材出处" table with a
-  `角色 —— 「鲸鱼娘」/ Whale Girl | 作者自有的角色线 | stushansusu` row. Two
-  observations were recorded without blocking: the zero-re-encode copy makes
-  the loop point a hard cut (the contributor's own measurement: 171.06 against
-  a p95 inter-frame delta of 8.71), and the background moved from H.264 to
-  HEVC (hvc1), which plays on the harness shell's Chromium 152 in the local
-  probe but reports an empty `canPlayType`, and which no other catalogue skin
-  uses.
+  the copyright gate. Evidence at the head the decision was written against
+  (`72606304`): the two `evidence/` files and the skin's `preview/` pair are
+  one file, `sha256 00a5aa97...`, 132,993 bytes, and the repository gates pass
+  (`dsh-skin validate` PASS, `skin-center:check` OK at 58 catalogue skins, 51
+  script tests green). The aesthetic read on the real screenshot is a pass: the
+  ink palette sits on the painting without cutting into it, the sidebar rows and
+  composer placeholder keep their contrast, the character is not cropped or
+  distorted, and the five ink steps plus the single ink-green state colour carry
+  the theme rather than a flat recolour. The hold is the record: nothing in the
+  skin directory names the depicted character - "Whale Girl" / "鲸鱼娘" - its
+  work or its rights holder, and `README.zh.md` carries no attribution or
+  licence section at all (`README.md` has an "Attribution and licence" section
+  but names no character either, and `skin.json`'s `attribution` names the
+  rights holder only for the engineering and the footage). The sibling
+  `rainy-night` shows the expected shape: a "许可证与素材出处" table with a
+  `角色 —— 「鲸鱼娘」/ Whale Girl | 作者自有的角色线 | stushansusu` row. One
+  observation was recorded without blocking: the copy shipped since head
+  `72606304` is a codec-only H.264 transcode of a loop that is still a hard cut
+  at the seam (the contributor's own measurement: 171.06 against a p95
+  inter-frame delta of 8.70), and the earlier H.264 -> HEVC -> H.264 round trip
+  cost the delivery 1.92 MiB to the 25 MiB asset cap.
+
+  The head moved three times inside the review, and the record keeps that.
+  `25d22701` was an H.264 copy whose loop was closed by a self-crossfade
+  (24,203,813 bytes, seam 0.02). `855644bb` replaced it with a zero-re-encode
+  HEVC copy (21,942,809 bytes) whose loop point became a hard cut. `72606304`
+  transcoded that copy back to H.264 (24,204,601 bytes, 1.92 MiB under the
+  25 MiB asset cap) after the HEVC copy was found to render a single frame and
+  stop inside the shell. The review's own HEVC observation had rested on a
+  probe one Chromium major ahead of the shell's engine, and the shell's own
+  engine is what the contributor then tested against.
 
 ## Alternatives considered
 
@@ -117,6 +126,11 @@ copyright record.**
   and its rights holder to be named in the tree; this submission names the
   engineering and the footage but never the character, and a screenshot proves
   the render, not the provenance.
+- **Calling the HEVC copy unsupported from a local probe.** Rejected after the
+  contributor's counter-evidence. The probe ran a Chromium one major ahead of
+  the shell's engine and `canPlayType('video/mp4; codecs="hvc1"')` was empty
+  even there; the shell's own engine was the test that mattered, and on it the
+  HEVC copy rendered one frame and stopped.
 - **Moving the dsh-web gitlinks for #29/#37 from this round.** Rejected at the
   time. #29 and #37 are content additions whose market landing the maintainer
   performs when publishing; #47/#48/#46 already had the domain owner's own
@@ -141,6 +155,7 @@ copyright record.**
   the catalogue and the market are unchanged by this pass.
 - A second reusable check came out of #53: a contributor can re-push a
   materially different head (a re-encoded background, rewritten READMEs, a new
-  evidence screenshot) minutes after a review request, so the gates have to be
+  evidence screenshot) three times inside one review, so the gates have to be
   re-read at the head that is current when the decision is written, not at the
-  one the review started from.
+  one the review started from - and the same applies to a review's own
+  observations, which have to name the engine they were measured on.
