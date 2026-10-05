@@ -147,3 +147,51 @@ The controller now tracks the in-flight switch (`isSwitching()`) and:
 `watchPersistedSelection` keeps following a selection changed by another page,
 which is what it is for; the boot window is closed by the two rules above rather
 than by weakening the follower.
+
+## Follow-up: a user-initiated activation claims the stage (issue #49)
+
+The withhold contract above made an explicit user action invisible while a
+wallpaper renders. A try-on during a wallpaper painted nothing and left no
+`html[data-dsh-skin]` stamp, so the delegated plugin could not tell "the user
+just asked for this skin" from "the skin is idle" - and it had nothing to act
+on, because the whole activation was withheld. Re-applying the skin already on
+was the same blind spot from the other side: the persisted selection does not
+move, so `POST /active` writes the value the peer can already read and an
+action leaves no trace anywhere.
+
+`tryOn()` and `switchTo()` now take an optional `userInitiated` flag, and the
+card passes it on the two paths a person clicks (try-on, apply - including
+re-applying what is already worn). That activation claims the stage: it skips
+the stand-down for exactly one activation, so the public stamp flips and the
+other plugin, which watches that stamp, can hand the page back. The claim is
+deliberately narrow:
+
+- **only a real skin claims it.** The stock look has nothing to paint, so a
+  withheld stock preview keeps reporting itself as stood down instead of
+  claiming a stage it does not use - otherwise the card's "paused" notice would
+  hide while the wallpaper still owns the page;
+- **it is one-shot and bounded.** `USER_INITIATED_YIELD_GRACE_MS` after the
+  atomic cut, a claim whose owner still reports itself active withdraws through
+  the ordinary withheld path. The hand-back it is waiting for is DOM-level and
+  far shorter than that window, so the window only has to cover a peer that
+  never answers;
+- **the withdrawal stands down** when a newer activation replaced the claim
+  (that one applies its own verdict), when another switch is in flight (it
+  sampled the verdict itself), and when the owner did answer;
+- **the timer is ledger-recorded**, so superseding the activation or shutting
+  the runtime down cancels it.
+
+Everything else is unchanged: the boot activation, the persisted-selection
+follower, `refresh()` and every rollback still honour the stand-down on their
+first evaluation. That is what makes the handoff self-healing - the claim only
+has to make the request visible, and the verdict flip that follows re-applies
+the remembered selection normally.
+
+Rejected: a second attribute (`html[data-dsh-skin-request]`) announcing the
+request without painting. It is zero-overlap and looks safer, but it adds an
+attribute contract both sides must keep in step and hands the sequencing of two
+attributes to the peer; reusing `html[data-dsh-skin]` keeps the dependency on
+one attribute pointing one way. Rejected as well: the claim without the
+withdrawal window - it would turn a frame-level overlap into a permanent one
+whenever the peer predates this contract.
+

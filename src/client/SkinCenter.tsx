@@ -16,6 +16,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
+import type { SkinActivationOptions } from './runtime/skin-controller.ts'
 import type { CatalogSkin, SkinRuntimeStore } from './runtime/boot.ts'
 import type { SkinBackgroundHandle } from './background.ts'
 import type { ExternalWallpaperHandle } from './external-wallpaper-handle.ts'
@@ -132,8 +133,14 @@ export function SkinCenter({ t, runtime, theme, background, externalWallpaper, p
       })
   }
 
+  // Try-on and apply are the two activations the user just asked for, so
+  // they CLAIM THE STAGE: while the delegated wallpaper plugin renders, one of
+  // them still paints once, which flips the public `html[data-dsh-skin]` stamp
+  // that plugin keys its hand-back on (issue #49). Every other path - the boot
+  // activation, the persisted-selection follower, refresh() - honors the
+  // stand-down unchanged.
   const tryOn = (entry: CatalogSkin): void => {
-    run(entry.manifest.id, () => preview.runSkin(() => runtime.controller.tryOn(entry.manifest.id, entry)))
+    run(entry.manifest.id, () => preview.runSkin(() => runtime.controller.tryOn(entry.manifest.id, entry, { userInitiated: true })))
   }
 
   const tryOnOfficial = (): void => {
@@ -158,9 +165,10 @@ export function SkinCenter({ t, runtime, theme, background, externalWallpaper, p
   const switchAndDeactivateCustomTheme = async (
     target: string | null,
     entry: CatalogSkin | null,
+    options?: SkinActivationOptions,
   ): Promise<string | null> => {
     const previous = { ...runtime.controller.getState() }
-    const active = await runtime.controller.switchTo(target, entry)
+    const active = await runtime.controller.switchTo(target, entry, options)
     if (active !== target) {
       throw new Error(`${target === null ? 'stock theme' : `skin ${target}`} did not activate`)
     }
@@ -200,7 +208,7 @@ export function SkinCenter({ t, runtime, theme, background, externalWallpaper, p
       setError(t('applyFailed'))
       return
     }
-    run(target, () => preview.runSkin(() => switchAndDeactivateCustomTheme(target, entry)))
+    run(target, () => preview.runSkin(() => switchAndDeactivateCustomTheme(target, entry, { userInitiated: true })))
   }
 
   const tryOnCustomTheme = (): void => {

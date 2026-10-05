@@ -20,6 +20,12 @@
  * lifecycleScope split: the ledger tracks activation scope; the catalog
  * snapshot, the decoration layer elements and the persisted selection are
  * component scope and survive every switch.
+ *
+ * One activation is an exception to "an external owner always wins": the one
+ * the user just asked for (issue #49). It paints once even while
+ * `suppressSkin()` reports another owner, because the public
+ * `html[data-dsh-skin]` stamp IS the signal that owner keys its hand-back on.
+ * The claim is bounded and one-shot - see {@link USER_INITIATED_YIELD_GRACE_MS}.
  * @module @linxin666/dsh-client-ui-skin-center/runtime/skin-controller
  */
 
@@ -85,6 +91,36 @@ export interface SkinControllerDeps {
   onError?: (message: string, error: unknown) => void
 }
 
+/**
+ * How long a user-initiated activation may hold the stage while another
+ * plugin still owns the visual (issue #49).
+ *
+ * The claim exists to make the request VISIBLE on the public
+ * `html[data-dsh-skin]` stamp, not to compete for the backdrop. The hand-back
+ * itself is DOM-level (the other plugin observes that stamp and clears its
+ * own), so this window only has to cover that round trip; when it expires
+ * without a hand-back the activation withdraws and the remembered selection
+ * repaints the moment that owner stops.
+ */
+export const USER_INITIATED_YIELD_GRACE_MS = 1500
+
+/** Per-activation options the card threads down from its own controls. */
+export interface SkinActivationOptions {
+  /**
+   * True when the user just asked for this activation from the card (try-on,
+   * apply, or re-apply of the skin already on). Such an activation CLAIMS THE
+   * STAGE: it paints once even while {@link SkinControllerDeps.suppressSkin}
+   * reports another owner, so `html[data-dsh-skin]` flips and that owner can
+   * give the page back (issue #49).
+   *
+   * The claim is one-shot and bounded (it withdraws after
+   * {@link USER_INITIATED_YIELD_GRACE_MS}), and it means nothing for the stock
+   * look: a withheld stock preview has nothing to paint, so it keeps
+   * reporting itself as stood down.
+   */
+  userInitiated?: boolean
+}
+
 export interface SkinControllerState {
   /** The currently applied skin (null = stock look). */
   active: string | null
@@ -111,12 +147,12 @@ export interface SkinController {
    * the id that is actually active after this call settles (which may be a
    * newer one if a later switch superseded it).
    */
-  switchTo(id: string | null, entry: ControllerSkinEntry | null): Promise<string | null>
+  switchTo(id: string | null, entry: ControllerSkinEntry | null, options?: SkinActivationOptions): Promise<string | null>
   /**
    * Preview a skin without persisting it. The committed skin is remembered;
    * exitTryOn() restores it. Try-on of the stock look passes null.
    */
-  tryOn(id: string | null, entry: ControllerSkinEntry | null): Promise<string | null>
+  tryOn(id: string | null, entry: ControllerSkinEntry | null, options?: SkinActivationOptions): Promise<string | null>
   /** Leave the preview, restoring the committed skin. */
   exitTryOn(): Promise<string | null>
   /** React-friendly store: subscribe + snapshot of {active, trying}. */
@@ -368,6 +404,7 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
     id: string | null,
     entry: ControllerSkinEntry | null,
     shouldPersist: boolean,
+    options?: SkinActivationOptions,
   ): Promise<string | null> {
     const seq = ++latestRequest
     switching = true
@@ -376,7 +413,15 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
     // activation is recorded and persisted but nothing is painted. `active`
     // still names the user's choice, which is what the card shows and what
     // repaints the moment that plugin stops.
-    const withheld = deps.suppressSkin?.() === true
+    //
+    // A user-initiated activation of a real skin is the one exception (issue
+    // #49): it claims the stage, so the public `html[data-dsh-skin]` stamp
+    // flips and that owner can see the request and hand the page back. The
+    // claim needs a skin to paint, so the stock look keeps reporting itself as
+    // stood down rather than claiming a stage it does not use.
+    const suppressed = deps.suppressSkin?.() === true
+    const claimsStage = options?.userInitiated === true && id !== null && entry !== null
+    const withheld = suppressed && !claimsStage
     try {
       if (!withheld && id !== null && entry !== null) {
         const stylesheetHref = `${apiBase}/skins/${id}/stylesheet`
@@ -423,6 +468,12 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
       }
       emit()
       if (previous !== null) ledger.disposeActivation(previous)
+      // A claim the external owner never answers must not sit on top of that
+      // owner's visual: re-check once the hand-back window is over (issue #49).
+      // Recorded while this activation is still the current one, because the
+      // settleSwitch below may replay a queued verdict flip, and that opens a
+      // newer activation which disposes this one (and its window) right away.
+      if (claimsStage && suppressed) scheduleYieldCheck(activation)
       // The paint has changed and the previous activation is retired: this is
       // the point an external verdict flip must be able to take over.
       // Persisting is a separate, unscheduled round-trip (POST /active can hang
@@ -481,6 +532,35 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
   }
 
   /**
+   * Re-check a stage claim once the hand-back window is over (issue #49).
+   *
+   * The claim is a request, not permission: if the external owner still
+   * reports itself active at the end of the window, this activation withdraws
+   * through the ordinary withheld path, so a peer that never answers the
+   * `html[data-dsh-skin]` stamp cannot leave the skin painted over its visual.
+   *
+   * Three ways the check stands down without acting, each correct:
+   *  - a newer activation replaced this one (it applies its own verdict, and
+   *    a newer claim brings its own window);
+   *  - another switch is in flight (that switch sampled the verdict itself);
+   *  - the owner handed the page back (the paint is what the user asked for,
+   *    and `refresh()` already sees a matching verdict, so it is left alone).
+   *
+   * The timer is ledger-recorded, so superseding this activation or shutting
+   * the runtime down cancels it.
+   * @param activation - the claiming activation this window belongs to.
+   */
+  function scheduleYieldCheck(activation: number): void {
+    const timer = setTimeout(() => {
+      if (activation !== currentActivation) return
+      if (switching) return
+      if (deps.suppressSkin?.() !== true) return
+      void switchInternal(active, active === null ? null : lastEntry, false)
+    }, USER_INITIATED_YIELD_GRACE_MS)
+    ledger.record(activation, 'yield:claim-window', () => clearTimeout(timer))
+  }
+
+  /**
    * Re-apply the current selection under the current external verdict.
    *
    * A switch already in flight sampled the verdict before this call, so this
@@ -511,12 +591,12 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
       return layers
     },
 
-    async switchTo(id, entry) {
-      return await switchInternal(id, entry, true)
+    async switchTo(id, entry, options) {
+      return await switchInternal(id, entry, true, options)
     },
 
-    async tryOn(id, entry) {
-      return await switchInternal(id, entry, false)
+    async tryOn(id, entry, options) {
+      return await switchInternal(id, entry, false, options)
     },
 
     async exitTryOn() {
