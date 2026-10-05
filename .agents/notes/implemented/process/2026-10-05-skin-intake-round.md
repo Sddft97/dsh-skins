@@ -17,9 +17,8 @@ arrived during the round and were reviewed with the rest.
 
 ## Decision
 
-**#29 and #37 were merged. #42 was held with changes requested. #46 was held
-with changes requested on a regression the round reproduced. #47 and #48 were
-reviewed as fixes and left for the collaborator who owns that domain.**
+**All four submissions were merged across the round: #29 and #37 on the first
+pass, #42 and #46 after the requested changes came back.**
 
 - #29 (lucy-nightsignal) answered all three items from the 2026-10-03 round:
   the contributor-responsibility statement is now in `README.md`,
@@ -35,26 +34,42 @@ reviewed as fixes and left for the collaborator who owns that domain.**
   standard without touching style or assets: the skin's own `LICENSE`, the
   contributor-responsibility statement, and an attribution naming the shipped
   models. Merged as `586bd202`.
-- #42 (model-dorm) passes the evidence and aesthetic gates - the two
-  `evidence/` files are byte-identical to the skin's `preview/` pair, and both
-  renders read cleanly - but the licensing record names no licence: `skin.json`
-  carries an `attribution` with no `license`/`licenseUrl`, and the directory
-  ships no `LICENSE`/`NOTICE`. Held until that record exists, with a note that
-  `nameEn` duplicates the Chinese `name`.
-- #46 (skin-center boot activation) fixes the reported root cause, but the round
-  reproduced a regression it introduces: `switching` is not released until
-  `await persist(id)` returns, so a hanging `POST /active` leaves a wallpaper
-  verdict flip queued and the skin stamp and `stoodDown: false` in place while
-  the wallpaper is already rendering. Confirmed by a direct controller test on
-  the head (base has no gate and stands down immediately). Held with a
-  request for changes that separates the visual commit from the persist wait.
+- #42 (model-dorm) passed the evidence and aesthetic gates on its first head -
+  the two `evidence/` files are byte-identical to the skin's `preview/` pair,
+  and both renders read cleanly - but the licensing record named no licence:
+  `skin.json` carried an `attribution` with no `license`/`licenseUrl`, and
+  the directory shipped no `LICENSE`/`NOTICE`. It was held for that, and for
+  an `nameEn` that duplicated the Chinese `name`. Head `968db3f2` answers
+  both: `license: "MIT"` plus `licenseUrl` in the manifest, a committed
+  `LICENSE` (`Copyright (c) 2026 Daizhdd`), a License section in both
+  READMEs, and `nameEn: "Home Model Girls"`. Re-verified on that head:
+  `dsh-skin validate` PASS, `skin-center:check` exit 0 at 56 catalogue
+  skins, the full suite 800 tests green, `tsc --noEmit` clean. Merged as
+  `8cbb6276`.
+- #46 (skin-center boot activation) fixed the reported root cause, but the
+  round reproduced a regression it introduced: `switching` was not released
+  until `await persist(id)` returned, so a hanging `POST /active` left a
+  wallpaper verdict flip queued and the skin stamp and `stoodDown: false` in
+  place while the wallpaper was already rendering. Confirmed by a direct
+  controller test on head `f5e2bbd7` (base has no gate and stands down
+  immediately). Head `4340e9b4` answers it: a new `settleSwitch(seq)` runs at
+  the atomic cut - after the `data-dsh-skin` flip and the previous activation's
+  dispose, before the write - with the switch's `finally` keeping an idempotent
+  call as the bail-before-the-cut safety net; `readPersistedSelection` now
+  checks `isSwitching()` on both sides of the `GET /active`. Re-verified: the
+  round's own hanging-persist reproduction now reads `stoodDown === true` with
+  the stamp removed while the POST is still pending (it read `false` on the
+  previous head), the added spec passes, 610 tests green, and a rebuild leaves
+  `lib` byte-identical to the sources. Merged by the domain owner as
+  `6386564`.
 - #47 and #48 are collaborator bug fixes in the Wallpaper Engine / skin-center
   domain (the Windows caption-menu host being matched by a classless
   `body > div` fallback; the blue-fantasy scrim-tracking sidebar fill painting
   the Windows whole-window frame opaque). Both pass their local gates - #47
   599 tests, #48 605 - and their own reproductions are mutation-checked. They
-  are approved on the record; the domain owner merges them, and the dsh-web
-  gitlink bumps ride that owner's own landing PRs (#1808, #1809, #1810).
+  are approved on the record; the domain owner merged them as `118d5aa1` and
+  `eb2acbef`, and the dsh-web gitlink bumps rode that owner's own landing PRs
+  (#1808, #1809, #1810).
 
 ## Alternatives considered
 
@@ -71,20 +86,23 @@ reviewed as fixes and left for the collaborator who owns that domain.**
   source/stylesheet fixes with no skin checklist to apply; they were reviewed
   against the code and their own specs, and their merge decision stays with the
   collaborator who owns that domain.
-- **Moving the dsh-web gitlinks from this round.** Rejected. #29 and #37 are
-  content additions whose market landing the maintainer performs when
-  publishing; #47/#48/#46 already have the domain owner's own landing PRs in
-  dsh-web.
+- **Moving the dsh-web gitlinks for #29/#37 from this round.** Rejected at the
+  time. #29 and #37 are content additions whose market landing the maintainer
+  performs when publishing; #47/#48/#46 already had the domain owner's own
+  landing PRs in dsh-web. #42's landing went out with the round that merged it,
+  because a new skin is content the market must publish.
 
 ## Consequences
 
-- Two skins enter the catalogue: lucy-nightsignal and the crt-phosphor
-  provenance correction. Both carry a contributor-responsibility statement, a
-  named rights holder and their own licence file.
-- #42 stays open on one item; the next round re-checks only the licence record.
-- #46 stays open on one regression; the contributor has the reproduction and
-  the suggested split between the visual activation and the persist wait.
+- Three skins enter the catalogue from this round: lucy-nightsignal, the
+  crt-phosphor provenance correction and model-dorm. Each carries a named
+  rights holder and its own licence file.
 - The round records a reusable check: a controller gate added for one race can
   starve an unrelated path if it is held open across an unbounded await, and
   the way to see it is to drive the controller directly with a persist that
-  never settles.
+  never settles. The fix is to release the gate at the point the state actually
+  changes, not after the last unrelated round-trip.
+- The round also records that a first-time contributor's workflow run stays in
+  action_required until someone with write access approves it; every first-time
+  merge this round needed that approval before the required check could go
+  green.
