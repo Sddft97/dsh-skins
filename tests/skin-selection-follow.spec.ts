@@ -43,7 +43,12 @@ function activeAnswer(active: () => string | null): typeof fetch {
  * window and the fetch seat off the store and drive its controller, so this
  * fake records the switches it was asked for instead of loading stylesheets.
  */
-function fakeStore(options: { catalog?: CatalogSkin[]; fetchImpl?: typeof fetch } = {}): {
+function fakeStore(options: {
+  catalog?: CatalogSkin[]
+  fetchImpl?: typeof fetch
+  /** Whether a switch is in flight (the follower must not converge into it). */
+  switching?: () => boolean
+} = {}): {
   store: SkinRuntimeStore
   switched: string[]
   catalogRefreshes: () => number
@@ -54,6 +59,7 @@ function fakeStore(options: { catalog?: CatalogSkin[]; fetchImpl?: typeof fetch 
   const store = {
     controller: {
       switchTo: async (id: string | null) => { switched.push(id ?? 'null'); return id },
+      isSwitching: () => options.switching?.() ?? false,
     },
     adapter: {},
     doc: document,
@@ -144,6 +150,34 @@ describe('applied-skin convergence (issue #1740)', () => {
 
     // Then the runtime is never asked to re-apply what it already shows
     expect(switched).toEqual([])
+    stop()
+  })
+
+  it('a poll taken while a switch is in flight does not supersede that activation (issue #1805)', async () => {
+    vi.useFakeTimers()
+    // Given a page whose boot switch is still in flight
+    let switching = true
+    let persisted: string | null = null
+    const { store, switched } = fakeStore({
+      catalog: [catalogSkin('blue-fantasy')],
+      fetchImpl: activeAnswer(() => persisted),
+      switching: () => switching,
+    })
+    const stop = watchPersistedSelection(store)
+    await vi.advanceTimersByTimeAsync(0)
+
+    // When a selection appears while that switch is still in flight
+    persisted = 'blue-fantasy'
+    await vi.advanceTimersByTimeAsync(2_500)
+
+    // Then the follower leaves the in-flight activation alone instead of
+    // opening a newer switch that would cancel it as stale
+    expect(switched).toEqual([])
+
+    // And once the switch settles, the same poll converges on the selection
+    switching = false
+    await vi.advanceTimersByTimeAsync(2_500)
+    expect(switched).toEqual(['blue-fantasy'])
     stop()
   })
 
