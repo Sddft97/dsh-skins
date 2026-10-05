@@ -112,3 +112,32 @@ outside this loader's control.
   (skin paused, skin remembered), where before it was an unsupported overlap.
 - The retired `skin-wallpaper` section stays in existing profile files untouched.
   Nothing migrates it, and nothing reads it.
+
+## Follow-up: boot recovery across an external verdict flip (issue #1805)
+
+The withhold contract above assumed the page's activation was already settled
+when the wallpaper started. On the desktop client it is not: the page carries no
+tapIndex `data-dsh-skin` stamp, so boot recovers the persisted selection
+asynchronously (`GET /active`, then a switch that loads the skin stylesheet).
+The wallpaper's media layer mounts inside that window and `refresh()` sees the
+verdict flip while the boot switch is still loading.
+
+`refresh()` used to act on that flip immediately, opening a second (empty)
+activation. That bumped the request sequence, so the in-flight boot switch was
+discarded as stale, and the page settled on the stock look with the official
+default marked active — while `~/.dsh/skin-center-active.json` still named the
+real skin. The selection follower could not repair it either: the disk value had
+not changed, and the repair path opens exactly the second activation that caused
+the problem.
+
+The controller now tracks the in-flight switch (`isSwitching()`) and:
+
+- defers a verdict flip observed mid-switch, replaying it once the newest switch
+  settles (the flip is not dropped: the in-flight activation sampled its verdict
+  before it);
+- the selection follower reads nothing while a switch is in flight, so a poll
+  cannot supersede the activation that boot is still establishing.
+
+`watchPersistedSelection` keeps following a selection changed by another page,
+which is what it is for; the boot window is closed by the two rules above rather
+than by weakening the follower.

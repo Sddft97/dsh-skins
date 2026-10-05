@@ -128,6 +128,14 @@ export interface SkinController {
    * A full fresh activation — latest-request-wins keeps it race-safe.
    */
   refresh(): Promise<string | null>
+  /**
+   * True while a switch (including the boot recovery that reads the persisted
+   * selection) is in flight. A page that recovers its selection asynchronously
+   * must be allowed to finish before any follower converges on a selection,
+   * or the late convergence supersedes the in-flight activation and the boot
+   * switch is discarded as stale (issue #1805).
+   */
+  isSwitching(): boolean
   /** Dispose the current activation (e.g. on plugin teardown). */
   shutdown(): void
 }
@@ -187,6 +195,16 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
   }))
 
   let latestRequest = 0
+  /**
+   * True from the moment a switch begins until the newest switch settles. A
+   * page that recovers its selection asynchronously (the desktop client boots
+   * without the tapIndex stamp) has an activation in flight while other
+   * subsystems start publishing, and an external verdict flip read during that
+   * window is replayed after it settles instead of racing it (issue #1805).
+   */
+  let switching = false
+  /** An external verdict flip observed while a switch was in flight. */
+  let refreshQueued = false
   let currentActivation: number | null = null
   const initialSkinId = doc.documentElement?.getAttribute('data-dsh-skin') || null
   let active: string | null = initialSkinId
@@ -352,6 +370,7 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
     shouldPersist: boolean,
   ): Promise<string | null> {
     const seq = ++latestRequest
+    switching = true
     const activation = ledger.beginActivation()
     // External stand-down (issue #39): another plugin owns the visual, so this
     // activation is recorded and persisted but nothing is painted. `active`
@@ -420,7 +439,44 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
       }
       onError(`switch to ${id ?? 'stock'} failed; previous skin intact`, error)
       return active
+    } finally {
+      // Only the newest switch clears the flag: an older one settling late must
+      // not report an in-flight newer switch as settled (issue #1805).
+      if (seq === latestRequest) {
+        switching = false
+        // A verdict flip that arrived while this switch was loading: it sampled
+        // its verdict before the flip, so replay the flip now that nothing is
+        // in flight. Dropping it would leave the page on a paint the external
+        // owner already superseded (issue #39 handoff, issue #1805).
+        if (refreshQueued) {
+          refreshQueued = false
+          void refresh()
+        }
+      }
     }
+  }
+
+  /**
+   * Re-apply the current selection under the current external verdict.
+   *
+   * A switch already in flight sampled the verdict before this call, so this
+   * defers the flip instead of opening a second activation: the second one
+   * would bump the request sequence and cancel the first, which is how the
+   * desktop boot lost its persisted selection (issue #1805).
+   */
+  async function refresh(): Promise<string | null> {
+    const suppressed = deps.suppressSkin?.() === true
+    if (suppressed === lastSuppressed) return active
+    if (switching) {
+      refreshQueued = true
+      return active
+    }
+    lastSuppressed = suppressed
+    if (active !== null && lastEntry === null) return active
+    // Re-apply the SAME logical selection: switchInternal decides whether it
+    // paints or withholds, so a wallpaper starting or stopping flips the page
+    // without touching what the user chose.
+    return await switchInternal(active, active === null ? null : lastEntry, false)
   }
 
   return {
@@ -453,16 +509,11 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
       return stateSnapshot
     },
 
-    async refresh() {
-      const suppressed = deps.suppressSkin?.() === true
-      if (suppressed === lastSuppressed) return active
-      lastSuppressed = suppressed
-      if (active !== null && lastEntry === null) return active
-      // Re-apply the SAME logical selection: switchInternal decides whether it
-      // paints or withholds, so a wallpaper starting or stopping flips the page
-      // without touching what the user chose.
-      return await switchInternal(active, active === null ? null : lastEntry, false)
+    isSwitching() {
+      return switching
     },
+
+    refresh,
 
     shutdown() {
       latestRequest += 1
