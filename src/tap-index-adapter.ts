@@ -6,6 +6,12 @@
  * structured row can express, and as a compatibility fallback when rows were
  * not rendered ahead of the tap.
  *
+ * Both halves stand down together when the delegated wallpaper plugin's
+ * persisted selection says a wallpaper is about to render (issue #51): the
+ * browser's first paint is decided by the delivered document, and the peer's
+ * live marker only arrives after its own client chain has run. Withholding
+ * here makes the first screen the wallpaper instead of a frame of skin.
+ *
  * Fail-closed: any problem yields the stock look plus at most one warning per
  * adapter and reason. Neither the row collector nor the tap throws.
  * @module @linxin666/dsh-client-ui-skin-center/tap-index-adapter
@@ -18,6 +24,18 @@ import { SKIN_CENTER_V2_PREFIX } from './routes-v2.ts'
 
 export interface SkinIndexTapDeps {
   readActiveId: () => string | null
+  /**
+   * First-screen pre-judgment (issue #51): true when the delegated wallpaper
+   * plugin's persisted selection says a wallpaper is about to render, so this
+   * screen must carry neither the `html[data-dsh-skin]` stamp nor the skin
+   * stylesheet. Without it the first paint is the skin and the page only cuts
+   * to the wallpaper once the peer's client chain stamps its marker.
+   *
+   * Only consulted when an active skin exists, so the stock look costs no
+   * extra read. Absent (older hosts, tests) means "no wallpaper": the
+   * document keeps whatever the runtime then decides.
+   */
+  readWallpaperOnStage?: () => boolean
   loadCatalog?: () => SkinCatalog
   /** Defaults to console.warn; tests inject a collector. */
   warn?: (message: string) => void
@@ -55,6 +73,7 @@ export function skinLinkTags(skinId: string, hasPatches: boolean): string {
 export function makeSkinIndexRows(deps: SkinIndexTapDeps): () => IndexInjection[] {
   const loadCatalog = deps.loadCatalog ?? (() => loadSkinCatalog())
   const warn = deps.warn ?? ((message: string) => console.warn(`[skin-center] ${message}`))
+  const wallpaperOnStage = deps.readWallpaperOnStage ?? (() => false)
   const warned = new Set<string>()
   const warnOnce = (reason: string, message: string) => {
     if (warned.has(reason)) return
@@ -66,6 +85,10 @@ export function makeSkinIndexRows(deps: SkinIndexTapDeps): () => IndexInjection[
     try {
       const active = deps.readActiveId()
       if (!active) return []
+      // The wallpaper owns this screen (issue #51): rows are the anti-FOUC half
+      // of the injection, so withholding them is what keeps the first paint
+      // off the skin. The runtime still holds the verdict.
+      if (wallpaperOnStage()) return []
       const entry = findSkin(loadCatalog(), active)
       if (!entry) {
         warnOnce(`missing:${active}`, `active skin "${active}" not in catalog; serving stock look`)
@@ -91,6 +114,7 @@ export function makeSkinIndexRows(deps: SkinIndexTapDeps): () => IndexInjection[
 export function makeSkinIndexTap(deps: SkinIndexTapDeps): (html: string) => string {
   const loadCatalog = deps.loadCatalog ?? (() => loadSkinCatalog())
   const warn = deps.warn ?? ((message: string) => console.warn(`[skin-center] ${message}`))
+  const wallpaperOnStage = deps.readWallpaperOnStage ?? (() => false)
   const warned = new Set<string>()
   const warnOnce = (reason: string, message: string) => {
     if (warned.has(reason)) return
@@ -102,6 +126,11 @@ export function makeSkinIndexTap(deps: SkinIndexTapDeps): (html: string) => stri
     try {
       const active = deps.readActiveId()
       if (!active) return html
+      // Same first-screen pre-judgment as the rows above (issue #51), on the
+      // raw tap: it is the half that stamps the opening html tag, and a
+      // document that reaches the browser already carrying a wallpaper must
+      // not reach it carrying the skin either.
+      if (wallpaperOnStage()) return html
       const catalog = loadCatalog()
       const entry = findSkin(catalog, active)
       if (!entry) {

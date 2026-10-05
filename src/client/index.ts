@@ -281,6 +281,14 @@ export function apply(ctx: ClientContext): void {
   // The state is read synchronously BEFORE the runtime boots, so a page that
   // loads with a wallpaper already rendering never paints a frame of skin
   // first. The watcher installed below then keeps it current.
+  //
+  // Reading it here is the second half of that guarantee, not the whole of it
+  // (issue #51): the marker is stamped by the peer's own client chain, so it
+  // is absent from the document this page loaded with, and a frame of skin is
+  // already painted by the time it lands. The host half therefore stands the
+  // index injection down for a persisted wallpaper selection, and this read
+  // covers the rest of the boot window; the runtime still holds the verdict,
+  // so a wallpaper that never renders is repainted normally.
   let externalWallpaperActive = externalWallpaperEngineActive(document)
   const externalWallpaperListeners = new Set<() => void>()
 

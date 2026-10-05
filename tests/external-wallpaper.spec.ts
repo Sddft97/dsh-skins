@@ -9,20 +9,25 @@
  * "not installed" steady state.
  */
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
 import {
+  EXTERNAL_WE_CONFIG_FILE,
+  EXTERNAL_WE_DATA_DIR_ENV,
+  EXTERNAL_WE_DEFAULT_DATA_DIR,
   EXTERNAL_WE_INSTALL_COMMAND,
   EXTERNAL_WE_PLUGIN,
   SIGNAL_CORDIS_ROW,
   SIGNAL_PROFILE_DEPENDENCY,
   detectExternalWallpaperEngine,
+  externalWallpaperConfigPath,
   externalWallpaperPaths,
   manifestNamesExternalWallpaper,
   patchNamesExternalWallpaper,
+  persistedExternalWallpaperActive,
 } from '../src/external-wallpaper.ts'
 
 /**
@@ -199,5 +204,68 @@ describe('external wallpaper signal matching', () => {
     // When the probe runs
     // Then it reports not installed rather than failing the route
     expect(detectExternalWallpaperEngine({ home: join(tmpdir(), 'skin-external-we-absent'), profile: 'web' }).installed).toBe(false)
+  })
+})
+
+/**
+ * One peer data directory holding the selection file the way its host writes
+ * it. A string config is written verbatim, so a truncated file is expressible.
+ */
+function weDataDir(config: unknown): string {
+  const dir = mkdtempSync(join(tmpdir(), 'skin-we-data-'))
+  writeFileSync(join(dir, EXTERNAL_WE_CONFIG_FILE), typeof config === 'string' ? config : JSON.stringify(config))
+  return dir
+}
+
+describe('first-screen wallpaper prediction (issue #51)', () => {
+  it('reads a persisted wallpaper out of the peer host file', () => {
+    // Given a peer that persisted a wallpaper choice
+    const env = { [EXTERNAL_WE_DATA_DIR_ENV]: weDataDir({ settings: { id: '3817824' } }) }
+
+    // When the first screen is pre-judged
+    // Then the wallpaper is on stage, so the document stays on the stock look
+    expect(persistedExternalWallpaperActive(env)).toBe(true)
+  })
+
+  it('resolves the peer directory from its own override, defaulting under the home', () => {
+    // Given the peer's data-directory override
+    const env = { [EXTERNAL_WE_DATA_DIR_ENV]: weDataDir({ settings: { id: 'x' } }) }
+    // Then the config file is read from exactly there
+    expect(externalWallpaperConfigPath(env).replace(/\\/g, '/'))
+      .toBe(join(env[EXTERNAL_WE_DATA_DIR_ENV], EXTERNAL_WE_CONFIG_FILE).replace(/\\/g, '/'))
+    // And with no override the documented default applies
+    expect(externalWallpaperConfigPath({}).replace(/\\/g, '/'))
+      .toBe(join(homedir(), EXTERNAL_WE_DEFAULT_DATA_DIR, EXTERNAL_WE_CONFIG_FILE).replace(/\\/g, '/'))
+  })
+
+  it('reports no wallpaper for a selection that names none', () => {
+    // Given every shape a "no wallpaper" selection arrives in
+    const envs = [
+      { settings: { id: '' } },
+      { settings: { id: '   ' } },
+      { settings: {} },
+      { settings: { id: 42 } },
+      { settings: null },
+      { settings: [{ id: '3817824' }] },
+      {},
+    ].map(config => ({ [EXTERNAL_WE_DATA_DIR_ENV]: weDataDir(config) }))
+
+    // When each is pre-judged
+    // Then only a real id counts: the skin is never withheld by a guess
+    for (const env of envs) expect(persistedExternalWallpaperActive(env)).toBe(false)
+  })
+
+  it('fails open toward the skin on an absent, malformed or unreadable file', () => {
+    // Given a directory without the file, a truncated file, and no directory
+    const missing = mkdtempSync(join(tmpdir(), 'skin-we-empty-'))
+    const truncated = weDataDir('{"settings": {"id": ')
+    const absent = join(tmpdir(), 'skin-we-absent-peer-dir')
+
+    // When each is pre-judged
+    // Then the answer is "no wallpaper", so a broken read cannot cost a user
+    // the skin they selected
+    expect(persistedExternalWallpaperActive({ [EXTERNAL_WE_DATA_DIR_ENV]: missing })).toBe(false)
+    expect(persistedExternalWallpaperActive({ [EXTERNAL_WE_DATA_DIR_ENV]: truncated })).toBe(false)
+    expect(persistedExternalWallpaperActive({ [EXTERNAL_WE_DATA_DIR_ENV]: absent })).toBe(false)
   })
 })

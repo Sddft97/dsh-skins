@@ -195,3 +195,52 @@ one attribute pointing one way. Rejected as well: the claim without the
 withdrawal window - it would turn a frame-level overlap into a permanent one
 whenever the peer predates this contract.
 
+## Follow-up: the first screen is pre-judged from the peer's persisted selection (issue #51)
+
+The withhold contract above turned on "the state is read synchronously BEFORE
+the runtime boots, so a page that loads with a wallpaper already rendering
+never paints a frame of skin first". That only covers a marker the DOCUMENT
+already carries, and the delegated plugin does not stamp one: it writes
+`body[data-we-wallpaper]` from its own client chain, a few hundred
+milliseconds into the boot. The browser's first paint is decided by the
+delivered document, so the page painted the skin - injected by the anti-FOUC
+seam - and only then cut to the wallpaper. The runtime could not fix it: no
+matter how fast it boots, the frame is already on screen.
+
+The host half therefore pre-judges the first screen. `persistedExternalWallpaperActive`
+in `src/external-wallpaper.ts` reads the peer's own persisted selection
+(`$DSH_WE_DATA_DIR/config.json`, defaulting to `~/.dsh-wallpaper-engine/config.json`)
+synchronously, and a non-empty `settings.id` stands the index injection down:
+no `html[data-dsh-skin]` stamp and no skin stylesheet row, so the document
+reaches the browser as the stock look. It is read per render and only when a
+skin is actually applied, so the stock-look path pays nothing.
+
+The rules that keep this from becoming a second source of truth:
+
+- **the marker stays the verdict.** The runtime still decides on
+  `body[data-we-wallpaper]`; the file only decides the frame the marker
+  cannot reach yet. A peer that fails to render takes its marker with it, and
+  the boot activation repaints the skin normally - the cost of a wrong
+  prediction is one stylesheet fetch, never a page stuck on the wrong look;
+- **it fails OPEN toward the skin.** An absent, unreadable, malformed or
+  not-yet-written file means "no wallpaper". Withholding a user's skin on a
+  broken read would be a worse defect than the flash this removes;
+- **the peer's file is its own contract, read-only.** `settings.id` is the
+  peer's stable persistence key and the host file its single source of truth;
+  `DSH_WE_DATA_DIR` moves the directory and nothing else. Nothing here writes
+  it, and the dependency keeps pointing one way;
+- **the probe is optional on the adapter.** `readWallpaperOnStage` defaults to
+  "no wallpaper", so a caller that does not wire it keeps today's document
+  exactly.
+
+Rejected: a declaration line the peer injects into the index HTML
+(`<meta name="we-wallpaper-active">`) for this side's tap to string-match.
+It needs no knowledge of the peer's on-disk layout, but it makes this package's
+first paint depend on the peer's injection ORDER, adds a second contract to
+keep in step for a decision one synchronous read already answers, and pushes
+the coordination onto the side that filed the issue. The peer's data directory
+is documented and stable; a string-match on injected HTML is neither.
+Rejected as well: withholding for any installed peer rather than a persisted
+selection - that would hand the page to a wallpaper plugin the user never
+picked, and would withhold the skin of every user who merely has it installed.
+

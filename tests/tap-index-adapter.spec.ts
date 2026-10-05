@@ -97,6 +97,47 @@ describe('makeSkinIndexRows', () => {
     expect(rows()).toEqual([])
     expect(warnings).toHaveLength(1)
   })
+
+  it('emits no row while a wallpaper owns the first screen (issue #51)', () => {
+    // Given an applied skin and a persisted wallpaper selection
+    const rows = makeSkinIndexRows({
+      readActiveId: () => 'harbor',
+      readWallpaperOnStage: () => true,
+      loadCatalog: () => catalogWith(['harbor'], ['harbor']),
+    })
+
+    // When the rows are collected
+    // Then there is no stylesheet to paint over the wallpaper's first frame
+    expect(rows()).toEqual([])
+  })
+
+  it('keeps injecting for a user with no wallpaper selected', () => {
+    // Given the same applied skin and no wallpaper
+    const rows = makeSkinIndexRows({
+      readActiveId: () => 'harbor',
+      readWallpaperOnStage: () => false,
+      loadCatalog: () => catalogWith(['harbor'], ['harbor']),
+    })
+    // Then the anti-FOUC injection is unchanged
+    expect(rows()).toEqual([{
+      kind: 'html',
+      placement: 'head',
+      html: skinLinkTags('harbor', true),
+    }])
+  })
+
+  it('never consults the wallpaper probe when no skin is applied', () => {
+    // Given the stock look
+    const seen: boolean[] = []
+    const rows = makeSkinIndexRows({
+      readActiveId: () => null,
+      readWallpaperOnStage: () => { seen.push(true); return true },
+      loadCatalog: () => catalogWith(['harbor']),
+    })
+    // Then the probe is not part of that screen's cost
+    expect(rows()).toEqual([])
+    expect(seen).toEqual([])
+  })
 })
 
 describe('makeSkinIndexTap', () => {
@@ -155,5 +196,34 @@ describe('makeSkinIndexTap', () => {
     })
     expect(tap(HTML)).toBe(HTML)
     expect(warnings[0]).toContain('disk exploded')
+  })
+
+  it('stamps nothing while a wallpaper owns the first screen (issue #51)', () => {
+    // Given an applied skin and a persisted wallpaper selection
+    const tap = makeSkinIndexTap({
+      readActiveId: () => 'harbor',
+      readWallpaperOnStage: () => true,
+      loadCatalog: () => catalogWith(['harbor'], ['harbor']),
+    })
+
+    // When the document is tapped
+    // Then it reaches the browser exactly as delivered: no stamp to scope the
+    // skin's CSS to, no stylesheet to paint a frame of skin with
+    expect(tap(HTML)).toBe(HTML)
+  })
+
+  it('stamps as before once the wallpaper is gone', () => {
+    // Given an applied skin and no wallpaper
+    const tap = makeSkinIndexTap({
+      readActiveId: () => 'harbor',
+      readWallpaperOnStage: () => false,
+      loadCatalog: () => catalogWith(['harbor'], ['harbor']),
+    })
+
+    // When the document is tapped
+    // Then the first paint is still the skin
+    const out = tap(HTML)
+    expect(out).toContain('data-dsh-skin="harbor"')
+    expect(out).toContain('/api/skin-center/v2/skins/harbor/stylesheet')
   })
 })
