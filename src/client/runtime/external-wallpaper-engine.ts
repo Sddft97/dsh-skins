@@ -28,6 +28,8 @@
  * @module @linxin666/dsh-client-ui-skin-center/runtime/external-wallpaper-engine
  */
 
+import { WALLPAPER_EXPECTED_ATTR } from '../../core/wallpaper-handoff.ts'
+
 /**
  * The stable attribute `dsh-plugin-wallpaper-engine` stamps on `body` while a
  * wallpaper is rendering. This is the plugin's public interop contract, the
@@ -41,6 +43,39 @@ export const EXTERNAL_WE_ACTIVE_TARGET = 'body'
 /** True when the external wallpaper plugin currently renders a wallpaper. */
 export function externalWallpaperEngineActive(doc: Document): boolean {
   return doc.body?.hasAttribute(EXTERNAL_WE_ACTIVE_ATTR) === true
+}
+
+/**
+ * True when the host withheld this document's skin for a PREDICTED wallpaper
+ * (issue #51), and no marker has arrived yet to confirm or deny it.
+ *
+ * This is what closes the second half of the flash. The host can pre-judge the
+ * first screen from the peer's persisted selection, but the browser half boots
+ * asynchronously: with no stamp in the document it recovers the selection from
+ * GET /active and activates it, which is exactly the switch that would paint a
+ * frame of skin into the gap the host just left. The prediction is what tells
+ * that switch to stand down until the peer's marker speaks.
+ *
+ * It expires (see {@link releasePrediction}) rather than standing forever: a
+ * wallpaper that never renders must not keep the user off their own skin.
+ * @param doc - the document the host stamped.
+ * @returns true while a prediction is outstanding.
+ */
+export function externalWallpaperPredicted(doc: Document): boolean {
+  return doc.documentElement?.hasAttribute(WALLPAPER_EXPECTED_ATTR) === true
+}
+
+/**
+ * Drop the host's prediction from the document, so a later read reports none.
+ *
+ * Called once the peer's marker has answered (either way) or the grace window
+ * has closed. The attribute is this package's own - the host half stamped it
+ * and no other plugin reads it - so clearing it here only ends this package's
+ * own first-screen bookkeeping and never touches the peer's marker.
+ * @param doc - the document the host stamped.
+ */
+export function releasePrediction(doc: Document): void {
+  doc.documentElement?.removeAttribute(WALLPAPER_EXPECTED_ATTR)
 }
 
 /**

@@ -33,7 +33,13 @@ import { SkinCenterSection, type SkinCenterInjected } from './SkinCenter.tsx'
 import { BackgroundController, SKIN_BACKGROUND_NS } from './background.ts'
 import type { SkinBackgroundConfig } from '../core/background.ts'
 import { initialSkinBackgroundReconcileState, reconcileSkinBackgroundPublication } from '../core/background-scope.ts'
-import { externalWallpaperEngineActive, watchExternalWallpaperEngine } from './runtime/external-wallpaper-engine.ts'
+import {
+  externalWallpaperEngineActive,
+  externalWallpaperPredicted,
+  releasePrediction,
+  watchExternalWallpaperEngine,
+} from './runtime/external-wallpaper-engine.ts'
+import { PREDICTED_WALLPAPER_GRACE_MS } from '../core/wallpaper-handoff.ts'
 import { setComposerFrostSuppressed } from './runtime/backdrop-scene.ts'
 import { bridgeWallpaperInstallFaces } from './external-wallpaper-install.ts'
 import { EXTERNAL_WE_PLUGIN, EXTERNAL_WE_REPO } from '../external-wallpaper.ts'
@@ -281,7 +287,27 @@ export function apply(ctx: ClientContext): void {
   // The state is read synchronously BEFORE the runtime boots, so a page that
   // loads with a wallpaper already rendering never paints a frame of skin
   // first. The watcher installed below then keeps it current.
+  //
+  // Reading it here is the second half of that guarantee, not the whole of it
+  // (issue #51): the marker is stamped by the peer's own client chain, so it
+  // is absent from the document this page loaded with, and a frame of skin is
+  // already painted by the time it lands.
+  //
+  // The host half therefore stands the index injection down for a persisted
+  // wallpaper selection and marks the document as withheld-for-prediction.
+  // This read is the other half: the browser boot recovers the selection
+  // asynchronously (GET /active, then a switch), so that first activation has
+  // to stand down too, or the withheld document is refilled with a frame of
+  // skin a few hundred milliseconds after it was served.
+  //
+  // The prediction is bounded and expires on its own. A wallpaper that never
+  // renders never stamps the marker, and the window is then the only thing
+  // between that user and their skin - so when it closes, the runtime applies
+  // the remembered selection as usual. The marker remains the verdict.
   let externalWallpaperActive = externalWallpaperEngineActive(document)
+  // True only while the host predicted a wallpaper and the peer has not yet
+  // answered; released by whichever comes first.
+  let externalWallpaperPredictedStill = externalWallpaperPredicted(document)
   const externalWallpaperListeners = new Set<() => void>()
 
   // The v2 skin runtime store: outlives the settings card so a try-on
@@ -289,7 +315,7 @@ export function apply(ctx: ClientContext): void {
   // wallpaper withholds the skin; a marker flip re-applies the user's
   // selection so the appearance changes without a reload.
   const runtime = bootSkinRuntime({
-    suppressSkin: () => externalWallpaperActive,
+    suppressSkin: () => externalWallpaperActive || externalWallpaperPredictedStill,
     suppressComposerFrost: () => externalWallpaperActive,
   })
   ctx.effect(() => () => runtime.shutdown(), 'ui-skin-center: runtime shutdown')
@@ -304,15 +330,48 @@ export function apply(ctx: ClientContext): void {
   // hints stay truthful) and re-applies the current skin, which is what paints
   // or withholds it without a reload. The first report carries the state the
   // boot above already used, so it is a no-op.
-  ctx.effect(() => watchExternalWallpaperEngine(document, (active) => {
-    if (active === externalWallpaperActive) return
-    externalWallpaperActive = active
-    // The external plugin paints its own composer glass, so this runtime
-    // yields the frost while the wallpaper renders (issue #39).
-    setComposerFrostSuppressed(document, active)
-    for (const listener of externalWallpaperListeners) listener()
-    void runtime.controller.refresh()
-  }), 'ui-skin-center: external wallpaper engine interop')
+  ctx.effect(() => {
+    // The peer's marker answering - either way - ends the host's prediction:
+    // the live verdict now owns the page, and the mark that stood the boot
+    // activation down has done its job. The very first report IS that answer,
+    // so a page whose peer stamps the marker before this plugin boots releases
+    // the prediction immediately rather than carrying it for the full window.
+    const dropPrediction = (): void => {
+      if (!externalWallpaperPredictedStill) return
+      externalWallpaperPredictedStill = false
+      releasePrediction(document)
+    }
+    const stopWatch = watchExternalWallpaperEngine(document, (active) => {
+      dropPrediction()
+      if (active === externalWallpaperActive) return
+      externalWallpaperActive = active
+      // The external plugin paints its own composer glass, so this runtime
+      // yields the frost while the wallpaper renders (issue #39).
+      setComposerFrostSuppressed(document, active)
+      for (const listener of externalWallpaperListeners) listener()
+      void runtime.controller.refresh()
+    })
+    // The peer never answered. A wallpaper that fails to render never stamps
+    // the marker, so the prediction has to expire on its own or this page
+    // would sit on the stock look until the next reload. Expiry is a normal
+    // stand-down lift: the remembered skin applies through the ordinary
+    // withheld path, so nothing about the recovery is special-cased.
+    let graceTimer: ReturnType<typeof setTimeout> | null = null
+    if (externalWallpaperPredictedStill) {
+      graceTimer = setTimeout(() => {
+        graceTimer = null
+        dropPrediction()
+        if (externalWallpaperActive) return
+        for (const listener of externalWallpaperListeners) listener()
+        void runtime.controller.refresh()
+      }, PREDICTED_WALLPAPER_GRACE_MS)
+    }
+    return () => {
+      stopWatch()
+      if (graceTimer !== null) clearTimeout(graceTimer)
+      dropPrediction()
+    }
+  }, 'ui-skin-center: external wallpaper engine interop')
   const preview = new PreviewCoordinator(runtime.controller, customTheme)
   const injected = (): SkinCenterInjected => ({
     runtime,

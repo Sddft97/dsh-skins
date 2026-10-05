@@ -21,6 +21,7 @@ import { migrateLegacySelection } from './legacy-bridge.ts'
 import { SKIN_BACKGROUND_DEFAULTS, type SkinBackgroundConfig } from './core/background.ts'
 import { findSkin, loadSkinCatalog } from './skin-repo.ts'
 import { mountOnce } from './mount-once.ts'
+import { persistedExternalWallpaperActive } from './external-wallpaper.ts'
 import {
   CUSTOM_THEME_DEFAULTS,
   CUSTOM_THEME_VERSION,
@@ -233,8 +234,14 @@ function applyImpl(ctx: Context, config?: SkinCenterConfig): void {
         // The anti-FOUC seam (issue #506): contribute stylesheet links through
         // DSH 0.1.1's structured table, then stamp html[data-dsh-skin] through
         // the raw tap because the table cannot mutate the opening html tag.
+        // Issue #51 widens the seam: a persisted wallpaper selection stands the
+        // injection down, because the peer's live marker arrives after the
+        // browser's first paint and the document is what decides that frame.
         const statePath = defaultActiveStatePath()
-        const indexDeps = { readActiveId: () => readActiveSelection(statePath) }
+        const indexDeps = {
+          readActiveId: () => readActiveSelection(statePath),
+          readWallpaperOnStage: () => persistedExternalWallpaperActive(),
+        }
         const collectSkinRows = makeSkinIndexRows(indexDeps)
         disposers.push(ctx.on('webserver/index-inject', (table) => {
           table.push(...collectSkinRows())

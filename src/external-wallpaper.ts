@@ -25,13 +25,24 @@
  *  - any patch layer reachable from the harness home carries a row naming the
  *    package (the plugin-manager write, including rows the manifest no longer
  *    backs).
+ *
+ * The second read here is the FIRST-SCREEN prediction (issue #51). The runtime
+ * withholds the skin off `body[data-we-wallpaper]`, which that plugin stamps
+ * from its own client chain a few hundred milliseconds into the boot - later
+ * than the browser's first paint, which the document itself decides. So the
+ * first screen would paint the skin and then cut to the wallpaper, and this
+ * package reads the peer's own persisted selection synchronously to pre-judge
+ * the first screen instead. The prediction is exactly that: the runtime still
+ * decides on the marker, and a prediction the peer never confirms costs one
+ * extra stylesheet fetch when the boot activation repaints the skin.
  * @module @linxin666/dsh-client-ui-skin-center/external-wallpaper
  */
 
 import { existsSync, readFileSync, statSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 
-import { resolveHarnessPaths } from './harness-home.ts'
+import { firstNonBlank, resolveHarnessPaths } from './harness-home.ts'
 
 /** The delegated wallpaper plugin this package interoperates with. */
 export const EXTERNAL_WE_PLUGIN = 'dsh-plugin-wallpaper-engine'
@@ -206,5 +217,68 @@ export function detectExternalWallpaperEngine(
     // The registry name and the install spec are the same string for this
     // package; it stays its own field so a pinned dist-tag can diverge later.
     npm: EXTERNAL_WE_PLUGIN,
+  }
+}
+
+/** Environment variable the peer's own host reads its data directory from. */
+export const EXTERNAL_WE_DATA_DIR_ENV = 'DSH_WE_DATA_DIR'
+
+/** The peer's default data directory, under the user's home. */
+export const EXTERNAL_WE_DEFAULT_DATA_DIR = '.dsh-wallpaper-engine'
+
+/** The file that directory carries, where the peer persists its selection. */
+export const EXTERNAL_WE_CONFIG_FILE = 'config.json'
+
+/**
+ * The peer's data directory: its own `$DSH_WE_DATA_DIR` override when set, and
+ * the documented default under the user's home otherwise. The host file is the
+ * only source of truth for the selection; this override moves where it lives
+ * and changes nothing else.
+ * @param env - the environment to read (tests), else this process's.
+ * @returns an absolute directory path.
+ */
+export function externalWallpaperDataDir(env: NodeJS.ProcessEnv = process.env): string {
+  return firstNonBlank(env[EXTERNAL_WE_DATA_DIR_ENV]) ?? join(homedir(), EXTERNAL_WE_DEFAULT_DATA_DIR)
+}
+
+/**
+ * The persisted-selection file the first-screen prediction reads.
+ * @param env - the environment to read (tests), else this process's.
+ * @returns an absolute file path, whether or not it exists.
+ */
+export function externalWallpaperConfigPath(env: NodeJS.ProcessEnv = process.env): string {
+  return join(externalWallpaperDataDir(env), EXTERNAL_WE_CONFIG_FILE)
+}
+
+/**
+ * Whether the peer's persisted selection names a wallpaper (issue #51).
+ *
+ * `settings.id` is that plugin's stable contract: its host owns the file and
+ * writes the chosen wallpaper into it, so a non-empty id means the wallpaper is
+ * what the next page load is about to bring up. Reading it synchronously is
+ * what lets the first screen already be the wallpaper.
+ *
+ * This is a FIRST-SCREEN pre-judgment, not a second source of truth. The
+ * runtime still decides on `body[data-we-wallpaper]`, which is the live
+ * verdict, so a prediction the peer never confirms (a wallpaper that fails to
+ * render and takes its marker with it) costs one stylesheet fetch when the
+ * boot activation repaints the skin. It is therefore fail-OPEN toward the
+ * skin: an absent, unreadable or malformed file means "no wallpaper", never a
+ * reason to withhold the skin the user selected.
+ * @param env - the environment to read (tests), else this process's.
+ * @returns true when a wallpaper is persisted.
+ */
+export function persistedExternalWallpaperActive(env: NodeJS.ProcessEnv = process.env): boolean {
+  try {
+    const config = readJsonIfFile(externalWallpaperConfigPath(env))
+    if (config === null) return false
+    const settings = config.settings
+    if (typeof settings !== 'object' || settings === null || Array.isArray(settings)) return false
+    const id = (settings as Record<string, unknown>).id
+    return typeof id === 'string' && id.trim() !== ''
+  } catch {
+    // Fail toward the skin: an unreadable peer file must not cost a user
+    // their skin.
+    return false
   }
 }
