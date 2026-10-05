@@ -235,6 +235,75 @@ body[data-dsh-skin-center] .card:hover {
   border-color: var(--dsw-alias-label-dimmed);
 }
 
+/* Skin grid: wallpaper-engine-style cards — a 16:9 preview thumbnail on top,
+   the name row and tagline beneath it, and the action buttons pinned to the
+   card bottom so rows stay aligned. */
+body[data-dsh-skin-center] .skinGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 20px 16px;
+}
+
+/* No height:100% here: on a grid item with an aspect-ratio child it makes the
+   card taller than its own row track, so the card bottom overlapped the next
+   row ("cards touch") and the slack pooled above the button row. The default
+   grid stretch already equalizes the row. */
+body[data-dsh-skin-center] .skinCard {
+  gap: 8px;
+  padding: 14px;
+}
+
+body[data-dsh-skin-center] .skinCard .actions {
+  margin-top: auto;
+}
+
+/* The tagline clamps to two lines AND always reserves them: every card then
+   has the same thumb + name + blurb height, so a short blurb leaves no void
+   between the text and the button row (the full text stays on the tooltip). */
+body[data-dsh-skin-center] .skinCard .cardTagline {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  min-height: 2.9em;
+}
+
+body[data-dsh-skin-center] .thumbWrap {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+body[data-dsh-skin-center] .thumb {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Preview-less placeholder (the official look, or a skin without preview
+   files): a quiet token gradient; a skin accent overrides it inline. */
+body[data-dsh-skin-center] .thumbEmpty {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, var(--dsw-alias-bg-layer-3), var(--dsw-alias-bg-layer-1));
+}
+
+/* State badges ride the thumbnail corners, same as the wallpaper grid. */
+body[data-dsh-skin-center] .thumbWrap .badge {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  margin-left: 0;
+}
+
+body[data-dsh-skin-center] .thumbWrap .thumbReport {
+  left: 6px;
+  right: auto;
+}
+
 body[data-dsh-skin-center] .cardHead {
   display: flex;
   align-items: center;

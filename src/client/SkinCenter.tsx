@@ -310,6 +310,9 @@ export function SkinCenter({ t, runtime, theme, background, externalWallpaper, p
   }
 
   const dark = document.body.hasAttribute('data-ds-dark-theme')
+  // Asset root for the preview thumbnails (the store exposes it; tests that
+  // stub the store without it fall back to the default mount point).
+  const apiBase = runtime.apiBase ?? '/api/skin-center/v2'
 
   /** One row: try-on control + apply button + optional uninstall. Shared by the official card and every skin card. */
   const actionButtons = (opts: {
@@ -588,20 +591,24 @@ export function SkinCenter({ t, runtime, theme, background, externalWallpaper, p
                   {error !== null && <div className={css.error}>{error}</div>}
 
                   <div className={css.list}>
+                    <div className={css.skinGrid}>
                     {(() => {
                       const isActive = activeId === null && !previewing && !customThemeState.applied
                       const isTrying = previewing && tryingId === null && !customThemeState.previewing
                       const badge = isActive ? t('active') : isTrying ? t('tryingOn') : null
                       return (
-                        <div className={css.card} key={OFFICIAL}>
-                          <div className={css.cardHead}>
-                            <span className={css.swatch} style={{ background: '#98a1ab' }} aria-hidden="true" />
-                            <span className={css.cardName} title={t('official')}>{t('official')}</span>
+                        <div className={`${css.card} ${css.skinCard}`} key={OFFICIAL}>
+                          <div className={css.thumbWrap}>
+                            <div className={css.thumbEmpty} aria-hidden="true" />
                             {badge !== null && (
                               <span className={`${css.badge} ${isActive ? css.badgeActive : css.badgeTrying}`}>
                                 {badge}
                               </span>
                             )}
+                          </div>
+                          <div className={css.cardHead}>
+                            <span className={css.swatch} style={{ background: '#98a1ab' }} aria-hidden="true" />
+                            <span className={css.cardName} title={t('official')}>{t('official')}</span>
                           </div>
                           <div className={css.cardTagline} title={t('officialTagline')}>{t('officialTagline')}</div>
                           {actionButtons({
@@ -621,18 +628,29 @@ export function SkinCenter({ t, runtime, theme, background, externalWallpaper, p
                       const isTrying = previewing && id === tryingId
                       const badge = isActive ? t('active') : isTrying ? t('tryingOn') : null
                       const report = verifyReports[id]
+                      // The thumbnail follows the live light/dark scheme, falling
+                      // back to the other variant when a skin ships only one.
+                      const previewPath = dark
+                        ? (entry.manifest.preview?.dark ?? entry.manifest.preview?.light)
+                        : (entry.manifest.preview?.light ?? entry.manifest.preview?.dark)
+                      const previewSrc = previewPath === undefined
+                        ? null
+                        : `${apiBase}/skins/${encodeURIComponent(id)}/${previewPath}`
                       return (
-                        <div className={css.card} key={id}>
-                          <div className={css.cardHead}>
-                            <span
-                              className={css.swatch}
-                              style={{ background: entry.manifest.accent ?? '#98a1ab' }}
-                              aria-hidden="true"
-                            />
-                            <span className={css.cardName} title={entry.manifest.nameEn}>{entry.manifest.nameEn}</span>
+                        <div className={`${css.card} ${css.skinCard}`} key={id}>
+                          <div className={css.thumbWrap}>
+                            {previewSrc !== null
+                              ? <img className={css.thumb} src={previewSrc} alt={entry.manifest.nameEn} loading="lazy" />
+                              : (
+                                <div
+                                  className={css.thumbEmpty}
+                                  style={{ background: entry.manifest.accent ?? undefined }}
+                                  aria-hidden="true"
+                                />
+                              )}
                             {report && (
                               <span
-                                className={`${css.badge} ${
+                                className={`${css.badge} ${css.thumbReport} ${
                                   report.status === 'valid'
                                     ? css.badgeSuccess
                                     : report.status === 'tampered'
@@ -660,6 +678,14 @@ export function SkinCenter({ t, runtime, theme, background, externalWallpaper, p
                               </span>
                             )}
                           </div>
+                          <div className={css.cardHead}>
+                            <span
+                              className={css.swatch}
+                              style={{ background: entry.manifest.accent ?? '#98a1ab' }}
+                              aria-hidden="true"
+                            />
+                            <span className={css.cardName} title={entry.manifest.nameEn}>{entry.manifest.nameEn}</span>
+                          </div>
                           <div className={css.cardTagline} title={entry.manifest.tagline ?? ''}>
                             {entry.manifest.tagline ?? ''}
                           </div>
@@ -682,6 +708,7 @@ export function SkinCenter({ t, runtime, theme, background, externalWallpaper, p
                         </div>
                       )
                     })}
+                    </div>
 
                     <CustomThemeCard
                       t={t}
