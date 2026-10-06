@@ -472,6 +472,47 @@ describe('skin controller', () => {
     expect(persist).toHaveBeenCalledTimes(1)
   })
 
+  it('adopt settles the selection without persisting it (issue #54)', async () => {
+    const persist = vi.fn(async () => {})
+    const { controller } = harness({ persist })
+
+    // Given a page that adopts the selection another client already saved
+    await controller.adopt('harbor', entryFor('harbor'))
+
+    // Then the page shows it and nothing is written back
+    expect(controller.active).toBe('harbor')
+    expect(document.documentElement.getAttribute('data-dsh-skin')).toBe('harbor')
+    expect(persist).not.toHaveBeenCalled()
+
+    // And it is a COMMIT, not a preview: a later try-on restores it, and
+    // exiting that try-on does not write either
+    await controller.tryOn('matrix', entryFor('matrix'))
+    expect(controller.getState()).toEqual({ active: 'matrix', trying: 'matrix', stoodDown: false, previewing: true })
+    await controller.exitTryOn()
+    expect(controller.getState()).toEqual({ active: 'harbor', trying: null, stoodDown: false, previewing: false })
+    expect(document.documentElement.getAttribute('data-dsh-skin')).toBe('harbor')
+    expect(persist).not.toHaveBeenCalled()
+  })
+
+  it('only switchTo writes the selection back (issue #54)', async () => {
+    const persist = vi.fn(async () => {})
+    const { controller } = harness({ persist })
+
+    // Given a page that adopted a selection and then re-painted itself
+    await controller.adopt('harbor', entryFor('harbor'))
+    await controller.refresh()
+
+    // Then the two reader paths wrote nothing
+    expect(persist).not.toHaveBeenCalled()
+
+    // When the user commits a choice from the card
+    await controller.switchTo('matrix', entryFor('matrix'))
+
+    // Then that is the one path that writes
+    expect(persist).toHaveBeenCalledTimes(1)
+    expect(persist).toHaveBeenCalledWith('matrix')
+  })
+
   it('committing during a preview clears the trying state', async () => {
     const { controller } = harness()
     await controller.tryOn('matrix', entryFor('matrix'))

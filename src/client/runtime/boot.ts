@@ -180,6 +180,14 @@ export function bootSkinRuntime(options: BootOptions = {}): SkinRuntimeStore {
   }
 
   // Initial activation: apply the persisted selection from the snapshot.
+  //
+  // Every switch here ADOPTS (issue #54). Boot is a READER: the selection it
+  // applies was written by whoever chose it - this page on an earlier load, or
+  // another client sharing the DSH home. Committing it back would make this
+  // page's own view of the selection authoritative, so a page booting from a
+  // stale `html[data-dsh-skin]` stamp would overwrite a newer choice another
+  // client has since saved (the desktop and web profiles share one
+  // skin-center-active.json, and both read it on boot).
   void (async () => {
     try {
       await refreshCatalog()
@@ -194,17 +202,17 @@ export function bootSkinRuntime(options: BootOptions = {}): SkinRuntimeStore {
       if (entry === null) {
         const defaultEntry = store.find('blue-fantasy')
         if (defaultEntry !== null) {
-          await controller.switchTo('blue-fantasy', defaultEntry as ControllerSkinEntry)
+          await controller.adopt('blue-fantasy', defaultEntry as ControllerSkinEntry)
         } else {
-          await controller.switchTo(null, null)
+          await controller.adopt(null, null)
         }
         return
       }
-      await controller.switchTo(active, entry as ControllerSkinEntry)
+      await controller.adopt(active, entry as ControllerSkinEntry)
     } catch {
       // Fail-closed: boot into the stock look; the card surfaces catalog
       // errors through diagnostics().
-      await controller.switchTo(null, null).catch(() => {})
+      await controller.adopt(null, null).catch(() => {})
     }
   })()
 
@@ -292,6 +300,12 @@ async function readPersistedSelection(store: SkinRuntimeStore): Promise<string |
  * Converge on the skin the persisted selection names, re-reading the catalog
  * first when the id is not in the current snapshot (a workshop install lands
  * after the page read the catalog).
+ *
+ * Convergence ADOPTS the selection (issue #54): this page is following a choice
+ * made elsewhere, so it applies that choice without writing it back. The value
+ * it is converging on was already persisted by whoever made it, and echoing it
+ * would let a reader overwrite a newer write - the second page to boot would
+ * win regardless of which choice was newer.
  */
 async function convergeOnSelection(store: SkinRuntimeStore, id: string | null): Promise<void> {
   if (id !== null && store.find(id) === null) {
@@ -303,12 +317,12 @@ async function convergeOnSelection(store: SkinRuntimeStore, id: string | null): 
     }
   }
   if (id === null) {
-    await store.controller.switchTo(null, null)
+    await store.controller.adopt(null, null)
     return
   }
   const entry = store.find(id)
   if (entry === null) return
-  await store.controller.switchTo(id, entry as ControllerSkinEntry)
+  await store.controller.adopt(id, entry as ControllerSkinEntry)
 }
 
 /** Converge on an announced skin id, re-reading the catalog when it is new. */
@@ -344,8 +358,9 @@ export function watchSkinAppliedEvents(store: SkinRuntimeStore): () => void {
  * written twice, and this page reads it back rather than assuming it owns
  * every write (issue #1740).
  *
- * The poll only reads: it never writes the selection back, it skips a value
- * already applied, and it stops while the page is hidden.
+ * The poll only reads: it never writes the selection back (it converges through
+ * `controller.adopt`, issue #54), it skips a value already applied, and it
+ * stops while the page is hidden.
  * @param store - the booted runtime store.
  * @param intervalMs - polling cadence in milliseconds.
  * @returns the idempotent teardown of the poll.
@@ -378,10 +393,23 @@ export function watchPersistedSelection(
   }
 
   void (async () => {
-    // Seed the baseline from the CURRENT selection without converging on it:
-    // boot already activated it, and re-activating would restart the skin
-    // runtime's own work on every load.
-    applied = await fetchPersistedSelection(store)
+    // Seed the baseline from what this page actually ends up showing, not from
+    // a blind disk read (issue #54). Boot adopts the id its own
+    // `data-dsh-skin` stamp names, or the persisted selection when there is no
+    // stamp; when the two differ, another client wrote a newer choice while
+    // this page was loading, and the page must still converge on it. Seeding
+    // the disk value unconditionally would mark that newer choice "already
+    // applied" and strand the page on the older skin.
+    //
+    // `undefined` leaves the baseline unset, so the first tick converges on
+    // the persisted selection. That used to be the thing this seeding avoided -
+    // re-activating restarts the skin runtime's own work - but converging is
+    // an ADOPT now, so the cost is a repaint and never a write.
+    const stamp = store.doc.documentElement?.getAttribute('data-dsh-skin') || null
+    const persisted = await fetchPersistedSelection(store)
+    applied = persisted === undefined
+      ? undefined
+      : (stamp === null || stamp === persisted ? persisted : undefined)
     if (!stopped) startTimer()
   })()
 

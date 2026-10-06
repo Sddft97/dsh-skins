@@ -148,6 +148,15 @@ The controller now tracks the in-flight switch (`isSwitching()`) and:
 which is what it is for; the boot window is closed by the two rules above rather
 than by weakening the follower.
 
+**Follow-up (issue #54): the follower and boot recovery ADOPT, they do not
+commit.** Closing the boot window left the older defect in place: both readers
+converged through `switchTo()`, which commits AND writes, so following another
+client's choice wrote this page's view of it back. Two clients sharing one
+`DSH_HOME` then overwrote each other in boot order. `switchInternal` now takes
+`commit` / `preview` / `adopt`, and every reader path uses `adopt`: apply the
+choice, never write it. See
+[2026-10-06-persisted-selection-single-writer](../bug-fix/2026-10-06-persisted-selection-single-writer.md).
+
 ## Follow-up: a user-initiated activation claims the stage (issue #49)
 
 The withhold contract above made an explicit user action invisible while a

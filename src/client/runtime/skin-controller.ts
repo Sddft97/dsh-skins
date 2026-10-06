@@ -121,6 +121,21 @@ export interface SkinActivationOptions {
   userInitiated?: boolean
 }
 
+/**
+ * How one activation treats the persisted selection (issue #54).
+ *
+ * - `commit` - the user chose this in the card: it becomes the committed
+ *   selection AND is POSTed, so every other client follows.
+ * - `preview` - a try-on (or an internal re-paint): the committed selection is
+ *   untouched and nothing is written.
+ * - `adopt` - this page is mirroring a selection ANOTHER client already
+ *   persisted (boot recovery, the persisted-selection follower). It becomes
+ *   this page's committed selection so try-on restores it and the poll sees it
+ *   as applied, but it is never written back: a reader that writes can
+ *   overwrite a newer choice the other client has since made.
+ */
+export type SkinActivationMode = 'commit' | 'preview' | 'adopt'
+
 export interface SkinControllerState {
   /** The currently applied skin (null = stock look). */
   active: string | null
@@ -153,6 +168,16 @@ export interface SkinController {
    * exitTryOn() restores it. Try-on of the stock look passes null.
    */
   tryOn(id: string | null, entry: ControllerSkinEntry | null, options?: SkinActivationOptions): Promise<string | null>
+  /**
+   * Adopt a selection another client already persisted, without writing it
+   * back (issue #54). The activation is a COMMIT - the selection becomes the
+   * committed one try-on restores and a later poll sees it as applied - but
+   * the value is not POSTed, because this page did not choose it. The two
+   * reader paths (boot recovery and the persisted-selection follower) use
+   * this: they mirror another client's choice, and mirroring must never
+   * overwrite a newer choice that client has since made.
+   */
+  adopt(id: string | null, entry: ControllerSkinEntry | null, options?: SkinActivationOptions): Promise<string | null>
   /** Leave the preview, restoring the committed skin. */
   exitTryOn(): Promise<string | null>
   /** React-friendly store: subscribe + snapshot of {active, trying}. */
@@ -403,7 +428,7 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
   async function switchInternal(
     id: string | null,
     entry: ControllerSkinEntry | null,
-    shouldPersist: boolean,
+    mode: SkinActivationMode,
     options?: SkinActivationOptions,
   ): Promise<string | null> {
     const seq = ++latestRequest
@@ -458,13 +483,16 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
       // not read it as a change and re-switch on the next call.
       lastSuppressed = withheld
       if (entry !== null) lastEntry = entry
-      if (shouldPersist) {
+      if (mode === 'preview') {
+        previewing = id !== committed.id
+        trying = previewing ? id : null
+      } else {
+        // 'commit' and 'adopt' both settle the selection: try-on restores it
+        // and the follower sees it as already applied. Only 'commit' writes it
+        // back, which is the whole difference (issue #54).
         committed = { id, entry }
         trying = null
         previewing = false
-      } else {
-        previewing = id !== committed.id
-        trying = previewing ? id : null
       }
       emit()
       if (previous !== null) ledger.disposeActivation(previous)
@@ -480,7 +508,7 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
       // on a paired desktop) and must not hold the page on a superseded paint
       // (issue #1805).
       settleSwitch(seq)
-      if (shouldPersist) {
+      if (mode === 'commit') {
         await persist(id).catch((error) => onError('failed to persist the skin selection', error))
       }
       return active
@@ -555,7 +583,7 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
       if (activation !== currentActivation) return
       if (switching) return
       if (deps.suppressSkin?.() !== true) return
-      void switchInternal(active, active === null ? null : lastEntry, false)
+      void switchInternal(active, active === null ? null : lastEntry, 'preview')
     }, USER_INITIATED_YIELD_GRACE_MS)
     ledger.record(activation, 'yield:claim-window', () => clearTimeout(timer))
   }
@@ -579,8 +607,10 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
     if (active !== null && lastEntry === null) return active
     // Re-apply the SAME logical selection: switchInternal decides whether it
     // paints or withholds, so a wallpaper starting or stopping flips the page
-    // without touching what the user chose.
-    return await switchInternal(active, active === null ? null : lastEntry, false)
+    // without touching what the user chose. Preview mode keeps this a pure
+    // repaint: the committed selection is already this one, and a repaint must
+    // never write (issue #54).
+    return await switchInternal(active, active === null ? null : lastEntry, 'preview')
   }
 
   return {
@@ -592,15 +622,19 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
     },
 
     async switchTo(id, entry, options) {
-      return await switchInternal(id, entry, true, options)
+      return await switchInternal(id, entry, 'commit', options)
     },
 
     async tryOn(id, entry, options) {
-      return await switchInternal(id, entry, false, options)
+      return await switchInternal(id, entry, 'preview', options)
+    },
+
+    async adopt(id, entry, options) {
+      return await switchInternal(id, entry, 'adopt', options)
     },
 
     async exitTryOn() {
-      const result = await switchInternal(committed.id, committed.entry, false)
+      const result = await switchInternal(committed.id, committed.entry, 'preview')
       return result
     },
 
