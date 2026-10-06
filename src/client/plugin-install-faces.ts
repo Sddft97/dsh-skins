@@ -56,13 +56,31 @@ export interface FamilyPluginManagerService {
   install(spec: string): Promise<unknown>
 }
 
-/** The faces this module bridged, either of which may be absent. */
+/**
+ * The official Plugins page's navigation face.
+ *
+ * Installing a plugin leaves the reader with one question the installer cannot
+ * answer: where to turn it on, and what it installed. The official panel already
+ * renders enablement, uninstall and install diagnostics, so a row that just
+ * installed something hands the reader there instead of growing a management
+ * surface of its own. Same face the Workshop store uses.
+ */
+export interface PluginNavigationService {
+  /**
+   * Open one installed bundle's page in the official Plugins panel.
+   * @param packageName - installed dependency (package) name.
+   */
+  openBundle(packageName: string): void
+}
+
+/** The faces this module bridged, any of which may be absent. */
 export interface InstallFaces {
   readonly native: NativePluginManagerService | null
   readonly family: FamilyPluginManagerService | null
+  readonly navigation: PluginNavigationService | null
 }
 
-let faces: InstallFaces = { native: null, family: null }
+let faces: InstallFaces = { native: null, family: null, navigation: null }
 const listeners = new Set<() => void>()
 
 /** Current faces snapshot (a cached reference, safe for useSyncExternalStore). */
@@ -116,6 +134,12 @@ export function bridgeInstallFaces(ctx: Context): void {
       patchFaces({ family: (inner.get('pluginManager') as FamilyPluginManagerService | undefined) ?? null })
       return () => { patchFaces({ family: null }) }
     }, 'ui-skin-center: family pluginManager bridge')
+  })
+  ctx.inject(['pluginNavigation'], (inner) => {
+    inner.effect(() => {
+      patchFaces({ navigation: (inner.get('pluginNavigation') as PluginNavigationService | undefined) ?? null })
+      return () => { patchFaces({ navigation: null }) }
+    }, 'ui-skin-center: official pluginNavigation bridge')
   })
 }
 

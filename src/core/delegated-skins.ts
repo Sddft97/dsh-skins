@@ -68,7 +68,14 @@ export interface DelegatedSkinDescriptor {
   /** Card copy: the plugin owns the wording, this is what it ships. */
   name: string
   nameEn: string
+  /** One line naming the look. */
   tagline: string
+  /**
+   * What the reader gets by applying it, in a sentence or two. This is what the
+   * row shows as its body: describing the look is the row's job, narrating the
+   * row's own state is not (the badge and the buttons already carry that).
+   */
+  description: string
   /** #rrggbb swatch shown where a skin would show a preview image. */
   accent: string
 }
@@ -94,6 +101,8 @@ export const CLAUDE_STYLE_SKIN: DelegatedSkinDescriptor = {
   name: 'Claude Code Style',
   nameEn: 'Claude Code Style',
   tagline: 'Claude Code Desktop theme, provided by the dsh-claude-style plugin',
+  description:
+    'The whole GUI as Claude Code Desktop: warm ivory canvas, serif body text, the ember accent, a pixel mascot on the composer and the chat-area behaviours Claude Code is known for. Its own settings page stays reachable while another skin is on screen.',
   accent: '#d97757',
 }
 

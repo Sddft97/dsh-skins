@@ -89,6 +89,17 @@ body[data-dsh-skin-center] .delegatedBadge {
   border: 1px solid var(--dsw-alias-border-l2);
 }
 
+/* The look itself: what applying this row gives you. Quieter than the
+   tagline above it, which names the look and this explains it. */
+body[data-dsh-skin-center] .delegatedDescription {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+}
+
+/* A reason the row withholds its selection buttons. That is the only state
+   worth a line of prose here, so it is the only one that gets one. */
 body[data-dsh-skin-center] .delegatedStatus {
   margin: 0;
   font-size: 12px;

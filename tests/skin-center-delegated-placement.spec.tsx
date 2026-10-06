@@ -44,6 +44,7 @@ const delegatedSkin: CatalogSkin = {
     name: 'Claude Code Style',
     nameEn: 'Claude Code Style',
     tagline: 'Claude Code Desktop theme',
+    description: 'The whole GUI as Claude Code Desktop: warm ivory canvas, serif body text.',
     accent: '#d97757',
     delegated: {
       package: 'dsh-claude-style',
@@ -184,7 +185,7 @@ describe('the delegated row placement', () => {
     })
 
     // Then the row offers the selection instead of the install
-    expect(host.textContent).toContain(zh.delegatedSkinReady)
+    expect(host.textContent).toContain('warm ivory canvas')
     expect(Array.from(host.querySelectorAll('button')).map(b => b.textContent))
       .toContain(zh.apply)
   })

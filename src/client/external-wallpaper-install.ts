@@ -22,4 +22,5 @@ export type {
   InstallOutcome,
   NativePluginManagerService,
   NativeRemoteResult,
+  PluginNavigationService,
 } from './plugin-install-faces.ts'

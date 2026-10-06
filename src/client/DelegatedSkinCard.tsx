@@ -14,6 +14,16 @@
  * carries the same head / tagline / actions shape as the custom-theme card
  * below the grid, so the two non-asset looks read as the same kind of row.
  *
+ * The body is the LOOK, not the row's state: a short description of what
+ * applying it gives you. State belongs to the badge (this row is active) and
+ * to the buttons (you can pick it, or you cannot, and here is the button that
+ * fixes that). Prose about the row's own state sat where a reader looks for a
+ * description of the theme, and said nothing they could not already see.
+ *
+ * Two states still earn one line each, because in both the row withholds the
+ * selection buttons and silence would read as a bug: a plugin that cannot hand
+ * the page back yet, and a descriptor the installed package has outgrown.
+ *
  * Three states, all read from two sources and never guessed:
  *
  *  - not installed: the one-click install through whichever plugin-management
@@ -149,15 +159,14 @@ export function DelegatedSkinCard(props: DelegatedSkinCardProps): ReactNode {
     void copyText(payload.installCommand).then((ok) => { setNotice(ok ? 'copied' : 'failed') })
   }
 
-  const status = !payload.installed
-    ? t('delegatedSkinMissing', { package: payload.package })
-    : claimable
-      ? t('delegatedSkinNoHandoff')
-      : yieldedToSkin
-        ? t('delegatedSkinYielded')
-        : !theme.live
-          ? t('delegatedSkinNotRunning')
-          : t('delegatedSkinReady')
+  // One line, and only where the row withholds the selection buttons: the
+  // reason it withholds them. Everything else about the state is already on
+  // screen (the badge says active, the buttons say pickable).
+  const blocker = claimable
+    ? t('delegatedSkinNoHandoff')
+    : payload.installed && !applicable && !yieldedToSkin
+      ? t('delegatedSkinNotRunning')
+      : null
 
   return (
     <div className={`${css.card} ${css.delegatedCard}`} data-delegated-skin={manifest.id}>
@@ -172,7 +181,8 @@ export function DelegatedSkinCard(props: DelegatedSkinCardProps): ReactNode {
         )}
       </div>
       <div className={css.cardTagline} title={manifest.tagline ?? ''}>{manifest.tagline ?? ''}</div>
-      <p className={css.delegatedStatus} role="status">{status}</p>
+      <p className={css.delegatedDescription}>{manifest.description}</p>
+      {blocker !== null && <p className={css.delegatedStatus} role="status">{blocker}</p>}
       {error !== null && (
         <p className={css.delegatedStatus} role="alert">{t('delegatedSkinInstallFailed', { reason: error })}</p>
       )}
@@ -198,6 +208,11 @@ export function DelegatedSkinCard(props: DelegatedSkinCardProps): ReactNode {
               {notice === 'copied' ? t('externalWallpaperCopied') : t('externalWallpaperCopyCommand')}
             </button>
           </>
+        )}
+        {payload.installed && faces.navigation !== null && (
+          <button type="button" className={css.button} onClick={() => { faces.navigation?.openBundle(spec) }}>
+            {t('delegatedSkinManage')}
+          </button>
         )}
         {applicable && (
           isActive && !isTrying ? (

@@ -30,6 +30,9 @@ import type { CatalogSkin } from '../src/client/runtime/boot.ts'
 
 const MARKERS = { bodyAttr: 'data-dsh-claude-style', handoffAttr: 'data-dsh-claude-style-handoff' }
 
+/** The row's body text: what applying this look gives the reader. */
+const DESCRIPTION = 'The whole GUI as Claude Code Desktop: warm ivory canvas, serif body text.'
+
 const DELEGATED_ENTRY = {
   manifest: {
     id: 'claude-style',
@@ -206,6 +209,7 @@ describe('the delegated skin row', () => {
       name: 'Claude Code Style',
       nameEn: 'Claude Code Style',
       tagline: 'Claude Code Desktop theme',
+      description: DESCRIPTION,
       accent: '#d97757',
       delegated: {
         package: 'dsh-claude-style',
@@ -243,11 +247,15 @@ describe('the delegated skin row', () => {
   }
 
   /** Publish the official plugin-manager face into the module store. */
-  async function publishNativeManager(service: unknown): Promise<void> {
+  async function publishNativeManager(service: unknown, navigation?: unknown): Promise<void> {
     bridgeInstallFaces({
       inject: (deps: string[], cb: (inner: unknown) => void) => {
         const inner = {
-          get: (name: string) => (name === 'remote.pluginManager' ? service : null),
+          get: (name: string) => {
+            if (name === 'remote.pluginManager') return service
+            if (name === 'pluginNavigation') return navigation ?? null
+            return null
+          },
           effect: (fn: () => () => void) => fn(),
         }
         for (const dep of deps) cb(inner)
@@ -292,6 +300,34 @@ describe('the delegated skin row', () => {
     expect(onInstalled).toHaveBeenCalled()
   })
 
+  it('hands the reader to the Plugins page once the plugin is installed', async () => {
+    // Given a host that publishes the Plugins page navigation face
+    const openBundle = vi.fn()
+    await publishNativeManager({ installBundle: vi.fn(async () => ({ ok: true, value: {} })) }, { openBundle })
+
+    // And a profile that already has the plugin
+    await render({ skin: skin(true) })
+
+    // Then the row offers the official page, where enablement lives
+    const manage = button(zh.delegatedSkinManage)
+    expect(manage).not.toBeNull()
+
+    // And pressing it opens that package's page
+    await act(async () => { manage?.click() })
+    expect(openBundle).toHaveBeenCalledWith('dsh-claude-style')
+  })
+
+  it('does not offer the Plugins page when the host publishes no navigation', async () => {
+    // Given a host with a manager but no navigation face
+    await publishNativeManager({ installBundle: vi.fn(async () => ({ ok: true, value: {} })) })
+
+    // And a profile that already has the plugin
+    await render({ skin: skin(true) })
+
+    // Then the row has no button that would go nowhere
+    expect(button(zh.delegatedSkinManage)).toBeNull()
+  })
+
   it('surfaces an install refusal instead of claiming success', async () => {
     // Given a manager that refuses the spec
     await publishNativeManager({
@@ -326,15 +362,15 @@ describe('the delegated skin row', () => {
     expect(button(zh.apply)).not.toBeNull()
   })
 
-  it('calls an installed plugin yielded rather than missing when a skin owns the page', async () => {
+  it('keeps the yielded plugin selectable and says nothing about it', async () => {
     // Given an installed plugin that stood down for the skin this card
     // selected: its markers are gone, which is the handoff working
     await render({ skin: skin(true), theme: { live: false, canYield: false }, yieldedToSkin: true })
 
-    // Then the row says it yielded, and never tells the reader to enable it
-    expect(host.textContent).toContain(zh.delegatedSkinYielded)
+    // Then the row shows the look, not a story about the row, and never tells
+    // the reader to enable a plugin that is running
+    expect(host.textContent).toContain(DESCRIPTION)
     expect(host.textContent).not.toContain(zh.delegatedSkinNotRunning)
-    expect(host.textContent).not.toContain(zh.delegatedSkinMissing)
   })
 
   it('keeps try-on and apply while yielded, so the reader can hand the page back', async () => {
