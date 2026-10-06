@@ -202,7 +202,9 @@ export function makeSkinCenterV2Routes(deps: RoutesV2Deps = {}): WebRoute[] {
       name: row.descriptor.name,
       nameEn: row.descriptor.nameEn,
       tagline: row.descriptor.tagline,
-      description: row.descriptor.description,
+      // The body copy travels as a locale key, never as words: it has to follow
+      // the interface language, and the card's dictionary already holds it.
+      descriptionKey: row.descriptor.descriptionKey,
       accent: row.descriptor.accent,
       // The delegated plugin's own identity and state, all the card needs and
       // nothing it can act on beyond the one-click install.

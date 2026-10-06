@@ -57,6 +57,8 @@
 import { useState, useSyncExternalStore, type ReactNode } from 'react'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 
+import type { SkinCenterKey } from './locales.ts'
+
 import {
   getInstallFaces,
   installPluginSpec,
@@ -122,6 +124,11 @@ export function DelegatedSkinCard(props: DelegatedSkinCardProps): ReactNode {
   const manifest = skin.manifest as CatalogSkin['manifest'] & { delegated: DelegatedPayload }
   const payload = manifest.delegated
   const accent = manifest.accent ?? '#98a1ab'
+  // The registry names the dictionary key rather than carrying the words, so
+  // the body follows the interface language. The one narrowing cast lives here:
+  // core cannot import the client's key union, and a missing key would render
+  // the key itself, which is loud enough to catch.
+  const description = t(manifest.descriptionKey as SkinCenterKey)
   const faces = useSyncExternalStore(subscribeInstallFaces, getInstallFaces)
   const [installing, setInstalling] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -181,7 +188,7 @@ export function DelegatedSkinCard(props: DelegatedSkinCardProps): ReactNode {
         )}
       </div>
       <div className={css.cardTagline} title={manifest.tagline ?? ''}>{manifest.tagline ?? ''}</div>
-      <p className={css.delegatedDescription}>{manifest.description}</p>
+      <p className={css.delegatedDescription}>{description}</p>
       {blocker !== null && <p className={css.delegatedStatus} role="status">{blocker}</p>}
       {error !== null && (
         <p className={css.delegatedStatus} role="alert">{t('delegatedSkinInstallFailed', { reason: error })}</p>

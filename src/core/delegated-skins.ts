@@ -71,11 +71,16 @@ export interface DelegatedSkinDescriptor {
   /** One line naming the look. */
   tagline: string
   /**
-   * What the reader gets by applying it, in a sentence or two. This is what the
-   * row shows as its body: describing the look is the row's job, narrating the
-   * row's own state is not (the badge and the buttons already carry that).
+   * The locale key holding the row's body copy, not the copy itself.
+   *
+   * The body is what the reader reads about the look, so it has to follow the
+   * interface language like every other string on this card. Keeping the text
+   * here would ship one language to everyone and walk straight past the
+   * zh/en/ru parity gate, so the registry names the key and the dictionary
+   * (client/locales.ts) owns the words. Typed as a plain string because core
+   * cannot import the client's key union; the row narrows it once.
    */
-  description: string
+  descriptionKey: string
   /** #rrggbb swatch shown where a skin would show a preview image. */
   accent: string
 }
@@ -101,8 +106,7 @@ export const CLAUDE_STYLE_SKIN: DelegatedSkinDescriptor = {
   name: 'Claude Code Style',
   nameEn: 'Claude Code Style',
   tagline: 'Claude Code Desktop theme, provided by the dsh-claude-style plugin',
-  description:
-    'The whole GUI as Claude Code Desktop: warm ivory canvas, serif body text, the ember accent, a pixel mascot on the composer and the chat-area behaviours Claude Code is known for. Its own settings page stays reachable while another skin is on screen.',
+  descriptionKey: 'delegatedSkinDescriptionClaudeStyle',
   accent: '#d97757',
 }
 

@@ -30,8 +30,8 @@ import type { CatalogSkin } from '../src/client/runtime/boot.ts'
 
 const MARKERS = { bodyAttr: 'data-dsh-claude-style', handoffAttr: 'data-dsh-claude-style-handoff' }
 
-/** The row's body text: what applying this look gives the reader. */
-const DESCRIPTION = 'The whole GUI as Claude Code Desktop: warm ivory canvas, serif body text.'
+/** The row's body copy, read from the dictionary the way the card reads it. */
+const DESCRIPTION = zh.delegatedSkinDescriptionClaudeStyle
 
 const DELEGATED_ENTRY = {
   manifest: {
@@ -209,7 +209,7 @@ describe('the delegated skin row', () => {
       name: 'Claude Code Style',
       nameEn: 'Claude Code Style',
       tagline: 'Claude Code Desktop theme',
-      description: DESCRIPTION,
+      descriptionKey: 'delegatedSkinDescriptionClaudeStyle',
       accent: '#d97757',
       delegated: {
         package: 'dsh-claude-style',
@@ -326,6 +326,16 @@ describe('the delegated skin row', () => {
 
     // Then the row has no button that would go nowhere
     expect(button(zh.delegatedSkinManage)).toBeNull()
+  })
+
+  it('renders the body from the dictionary, so it follows the interface language', async () => {
+    // Given the card in Chinese, which is what this file's t() seat serves
+    await render({ skin: skin(true), theme: { live: true, canYield: true } })
+
+    // Then the body is the Chinese copy the dictionary holds, and the English
+    // string the registry used to carry is nowhere on the row
+    expect(host.textContent).toContain(zh.delegatedSkinDescriptionClaudeStyle)
+    expect(host.textContent).not.toContain('warm ivory canvas')
   })
 
   it('surfaces an install refusal instead of claiming success', async () => {

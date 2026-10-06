@@ -20,6 +20,7 @@ export type SkinCenterKey =
   | 'externalWallpaperCopied'
   | 'externalWallpaperInstallFailed'
   | 'delegatedSkinBadge'
+  | 'delegatedSkinDescriptionClaudeStyle'
   | 'delegatedSkinNotRunning'
   | 'delegatedSkinManage'
   | 'delegatedSkinNoHandoff'
@@ -181,6 +182,8 @@ export const en: Record<SkinCenterKey, string> = {
   externalWallpaperCopied: 'Copied',
   externalWallpaperInstallFailed: 'Install failed: {reason}',
   delegatedSkinBadge: 'Plugin theme',
+  delegatedSkinDescriptionClaudeStyle:
+    'The whole GUI as Claude Code Desktop: warm ivory canvas, serif body text, the ember accent, a pixel mascot on the composer and the chat-area behaviours Claude Code is known for. Its own settings page stays reachable while another skin is on screen.',
   delegatedSkinNotRunning: 'The plugin is installed but not running here. Enable it in Plugins, then reopen this page.',
   delegatedSkinNoHandoff: 'The running plugin build cannot hand the page back to a skin, so it cannot be selected from here. Update dsh-claude-style.',
   delegatedSkinInstall: 'Install now',
@@ -343,6 +346,8 @@ export const zh: Record<SkinCenterKey, string> = {
   externalWallpaperCopied: '已复制',
   externalWallpaperInstallFailed: '安装失败：{reason}',
   delegatedSkinBadge: '插件皮肤',
+  delegatedSkinDescriptionClaudeStyle:
+    '整副界面就是 Claude Code Desktop：暖米色画布、衬线正文、余烬橙强调色、输入框上沿的像素吉祥物，以及 Claude Code 那些对话区交互。它自带的设置页在别的皮肤在屏时照常可用。',
   delegatedSkinNotRunning: '插件已安装但当前页面没有运行。请在「插件」中启用它，然后刷新本页。',
   delegatedSkinNoHandoff: '当前运行的插件版本无法在皮肤之间让出页面，因此这里不能选用它。请更新 dsh-claude-style。',
   delegatedSkinInstall: '一键安装',

@@ -44,7 +44,7 @@ const delegatedSkin: CatalogSkin = {
     name: 'Claude Code Style',
     nameEn: 'Claude Code Style',
     tagline: 'Claude Code Desktop theme',
-    description: 'The whole GUI as Claude Code Desktop: warm ivory canvas, serif body text.',
+    descriptionKey: 'delegatedSkinDescriptionClaudeStyle',
     accent: '#d97757',
     delegated: {
       package: 'dsh-claude-style',
@@ -184,8 +184,9 @@ describe('the delegated row placement', () => {
       },
     })
 
-    // Then the row offers the selection instead of the install
-    expect(host.textContent).toContain('warm ivory canvas')
+    // Then the row offers the selection instead of the install, and its body
+    // is the dictionary's copy in the interface language, not English words
+    expect(host.textContent).toContain(zh.delegatedSkinDescriptionClaudeStyle)
     expect(Array.from(host.querySelectorAll('button')).map(b => b.textContent))
       .toContain(zh.apply)
   })

@@ -36,6 +36,12 @@ export interface CatalogSkin {
     nameEn: string
     tagline?: string
     description?: string
+    /**
+     * Locale key of a delegated skin's body copy, where the row names a look
+     * rather than describing one. Asset skins carry no key: their manifest
+     * description is a single-language string they do not render as body copy.
+     */
+    descriptionKey?: string
     accent?: string
     order?: number
     author?: string
