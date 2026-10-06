@@ -125,6 +125,21 @@ export function SkinCenter({ t, runtime, theme, background, externalWallpaper, d
     read()
     return delegatedSkins.subscribe(read)
   }, [delegatedSkins])
+  /**
+   * Whether an asset skin this card selected is standing on the delegated
+   * plugin.
+   *
+   * The plugin's markers vanish while it yields, which from out here looks
+   * exactly like a plugin that never loaded. The card knows the difference:
+   * with the delegated row itself selected, absent markers mean the plugin
+   * owns the page; with a real skin selected, absent markers mean the plugin
+   * stood down for that skin, which is the handoff working. Stock look
+   * (activeId null) is neither, and says so.
+   */
+  const delegatedSelected = activeEntry !== null && isDelegatedCatalogSkin(activeEntry)
+  const assetSkinPainted = activeId !== null && !delegatedSelected
+  const paintsOverDelegated = (entry: CatalogSkin, state: DelegatedThemeState | undefined): boolean =>
+    assetSkinPainted && activeId !== entry.manifest.id && state?.live !== true
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [verifying, setVerifying] = useState(false)
@@ -789,6 +804,7 @@ export function SkinCenter({ t, runtime, theme, background, externalWallpaper, d
                           theme={delegatedStates[id] ?? { live: false, canYield: false }}
                           isActive={id === activeId && !previewing}
                           isTrying={previewing && id === tryingId}
+                          yieldedToSkin={paintsOverDelegated(entry, delegatedStates[id])}
                           busy={busyId === id}
                           disabled={busyId !== null || uninstallingId !== null}
                           onTryOn={() => { tryOn(entry) }}

@@ -226,9 +226,10 @@ describe('the delegated skin row', () => {
         <DelegatedSkinCard
           t={t as never}
           skin={skin(props.skin?.manifest.delegated?.installed ?? false)}
-          theme={{ live: false, canYield: false }}
+          theme={props.theme ?? { live: false, canYield: false }}
           isActive={false}
           isTrying={false}
+          yieldedToSkin={false}
           busy={false}
           disabled={false}
           onTryOn={() => {}}
@@ -323,6 +324,36 @@ describe('the delegated skin row', () => {
     await render({ skin: skin(true), theme: { live: true, canYield: true } })
     expect(button(zh.tryOn)).not.toBeNull()
     expect(button(zh.apply)).not.toBeNull()
+  })
+
+  it('calls an installed plugin yielded rather than missing when a skin owns the page', async () => {
+    // Given an installed plugin that stood down for the skin this card
+    // selected: its markers are gone, which is the handoff working
+    await render({ skin: skin(true), theme: { live: false, canYield: false }, yieldedToSkin: true })
+
+    // Then the row says it yielded, and never tells the reader to enable it
+    expect(host.textContent).toContain(zh.delegatedSkinYielded)
+    expect(host.textContent).not.toContain(zh.delegatedSkinNotRunning)
+    expect(host.textContent).not.toContain(zh.delegatedSkinMissing)
+  })
+
+  it('keeps try-on and apply while yielded, so the reader can hand the page back', async () => {
+    // Given the same yielded plugin
+    await render({ skin: skin(true), theme: { live: false, canYield: false }, yieldedToSkin: true })
+
+    // Then the selection controls are there: switching back is the action that
+    // hands the page to the plugin again
+    expect(button(zh.tryOn)).not.toBeNull()
+    expect(button(zh.apply)).not.toBeNull()
+  })
+
+  it('still says not running when nothing is painted and the plugin is absent', async () => {
+    // Given an installed plugin that is simply not on this page
+    await render({ skin: skin(true), theme: { live: false, canYield: false }, yieldedToSkin: false })
+
+    // Then the row points at the Plugins page, which is the actionable truth
+    expect(host.textContent).toContain(zh.delegatedSkinNotRunning)
+    expect(button(zh.apply)).toBeNull()
   })
 
   it('refuses to offer a live plugin that cannot hand the page back', async () => {

@@ -22,6 +22,7 @@ export type SkinCenterKey =
   | 'delegatedSkinBadge'
   | 'delegatedSkinMissing'
   | 'delegatedSkinNotRunning'
+  | 'delegatedSkinYielded'
   | 'delegatedSkinNoHandoff'
   | 'delegatedSkinReady'
   | 'delegatedSkinInstall'
@@ -184,6 +185,7 @@ export const en: Record<SkinCenterKey, string> = {
   delegatedSkinBadge: 'Plugin theme',
   delegatedSkinMissing: 'Not installed. This look comes from the {package} plugin.',
   delegatedSkinNotRunning: 'The plugin is installed but not running here. Enable it in Plugins, then reopen this page.',
+  delegatedSkinYielded: 'The plugin is running and has stepped aside for the skin you applied. Applying this row hands the page back to it.',
   delegatedSkinNoHandoff: 'The running plugin build cannot hand the page back to a skin, so it cannot be selected from here. Update dsh-claude-style.',
   delegatedSkinReady: 'The plugin paints this look. Any other skin, the default look or a wallpaper takes the page back.',
   delegatedSkinInstall: 'Install plugin',
@@ -347,6 +349,7 @@ export const zh: Record<SkinCenterKey, string> = {
   delegatedSkinBadge: '插件皮肤',
   delegatedSkinMissing: '尚未安装。这套外观由 {package} 插件提供。',
   delegatedSkinNotRunning: '插件已安装但当前页面没有运行。请在「插件」中启用它，然后刷新本页。',
+  delegatedSkinYielded: '插件正在运行，并已为你选中的皮肤让位。应用这一行即把页面交还给它。',
   delegatedSkinNoHandoff: '当前运行的插件版本无法在皮肤之间让出页面，因此这里不能选用它。请更新 dsh-claude-style。',
   delegatedSkinReady: '该插件负责绘制这套外观。切换到其他皮肤、官方默认或壁纸时，页面会自动交还给它们。',
   delegatedSkinInstall: '一键安装插件',

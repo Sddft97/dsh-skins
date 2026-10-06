@@ -31,6 +31,15 @@
  * delegation exists to prevent, so the row says the plugin has to be updated
  * and still lets them look at it.
  *
+ * The state that needs care is ABSENT markers while a skin is painted. That is
+ * what a working handoff looks like from out here: the plugin is installed,
+ * running, and standing down because this card's own skin owns the page. Read
+ * as "not running" it both lies and strands the reader — no buttons, no way
+ * back — so the row takes {@link DelegatedSkinCardProps.yieldedToSkin} from the
+ * card (which knows what is painted), says the plugin yielded, and keeps the
+ * try-on / apply buttons: switching back is exactly the action that hands the
+ * page over again.
+ *
  * Everything the peer publishes is read, never written: the two attributes
  * (see runtime/delegated-theme.ts) and the install call the host itself makes.
  * @module @linxin666/dsh-client-ui-skin-center/DelegatedSkinCard
@@ -68,6 +77,12 @@ export interface DelegatedSkinCardProps {
   theme: DelegatedThemeState
   isActive: boolean
   isTrying: boolean
+  /**
+   * True when this row has no markers of its own but a real skin is painted:
+   * the delegated plugin is running and standing down for that skin, which is
+   * the handoff working, not a plugin that failed to load.
+   */
+  yieldedToSkin: boolean
   busy: boolean
   disabled: boolean
   onTryOn: () => void
@@ -93,7 +108,7 @@ async function copyText(text: string): Promise<boolean> {
  * @returns the row.
  */
 export function DelegatedSkinCard(props: DelegatedSkinCardProps): ReactNode {
-  const { t, skin, theme, isActive, isTrying, busy, disabled } = props
+  const { t, skin, theme, isActive, isTrying, yieldedToSkin, busy, disabled } = props
   const manifest = skin.manifest as CatalogSkin['manifest'] & { delegated: DelegatedPayload }
   const payload = manifest.delegated
   const accent = manifest.accent ?? '#98a1ab'
@@ -104,10 +119,14 @@ export function DelegatedSkinCard(props: DelegatedSkinCardProps): ReactNode {
 
   const canInstall = faces.native !== null || faces.family !== null
   const spec = payload.package
-  // The row is applicable only when the plugin is actually on the page AND its
-  // build can hand the page back. Anything less is stated, not offered.
-  const applicable = theme.live && theme.canYield
-  const claimable = theme.live && !theme.canYield
+  // The row is applicable when the plugin can own the page: it owns it now
+  // (live and able to yield back), or it will the moment nothing else paints
+  // (yielded to the skin this card has selected). A plugin that is installed
+  // but neither live nor yielding is not on this page at all.
+  const applicable = payload.installed && theme.live
+    ? theme.canYield
+    : payload.installed && yieldedToSkin
+  const claimable = payload.installed && theme.live && !theme.canYield
 
   const onInstall = (): void => {
     if (installing || !isInstallSpecValid(spec)) return
@@ -132,11 +151,13 @@ export function DelegatedSkinCard(props: DelegatedSkinCardProps): ReactNode {
 
   const status = !payload.installed
     ? t('delegatedSkinMissing', { package: payload.package })
-    : !theme.live
-      ? t('delegatedSkinNotRunning')
-      : claimable
-        ? t('delegatedSkinNoHandoff')
-        : t('delegatedSkinReady')
+    : claimable
+      ? t('delegatedSkinNoHandoff')
+      : yieldedToSkin
+        ? t('delegatedSkinYielded')
+        : !theme.live
+          ? t('delegatedSkinNotRunning')
+          : t('delegatedSkinReady')
 
   return (
     <div className={`${css.card} ${css.delegatedCard}`} data-delegated-skin={manifest.id}>
