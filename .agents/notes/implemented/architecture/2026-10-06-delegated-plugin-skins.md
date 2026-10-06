@@ -78,6 +78,15 @@ is the difference between a feature and a claim - offering apply on a plugin
 that cannot yield would let the user select this skin and then pick a real skin
 over it, which is precisely the double-owner page the delegation exists to end.
 
+**The row is a full-width bar ABOVE the skin grid, not a tile in it.** The
+grid's cells exist to carry a 16:9 preview image, and this package holds no
+preview for a look another plugin paints; a tile would be an accent-coloured
+box with four fifths of it empty. As a bar it shares the head / tagline /
+actions shape with the custom-theme card below the grid, so the two looks this
+package does not paint read as the same kind of row, and it leads the list
+because it is the one row that is also an install prompt: the reader meets it
+before scrolling past forty asset skins.
+
 ## Alternatives considered
 
 - **Keep it a notice, like the wallpaper coexistence advisory.** Rejected. That

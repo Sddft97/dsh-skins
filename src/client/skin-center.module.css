@@ -68,22 +68,18 @@ body[data-dsh-skin-center] .cardBody {
   border-top: 1px solid var(--dsw-alias-border-l2);
 }
 
-/* Delegated skin row: a skin whose visual is another plugin's. It sits in the
-   skin grid with the rest, so it borrows the card shell and adds only the two
-   things that are its own: the kind badge on the thumbnail and the status line
-   that says whether that plugin can paint the page yet. The status line uses
-   the label tokens, not the warning ones: "not installed" is a state of the
-   row, not a problem with the skin list. */
+/* Delegated skin row: a skin whose visual is another plugin's. It is a
+   full-width bar above the skin grid, not a tile in it, because it has no
+   preview image to fill a thumbnail with — the plugin paints it. So it borrows
+   the plain card shell and adds only what is its own: the kind pill beside the
+   name, the status line saying whether that plugin can paint the page yet, and
+   the docs link. The status line uses the label tokens, not the warning ones:
+   "not installed" is a state of the row, not a problem with the skin list. */
 body[data-dsh-skin-center] .delegatedCard {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  overflow: hidden;
 }
 
 body[data-dsh-skin-center] .delegatedBadge {
-  position: absolute;
-  top: 6px;
-  left: 6px;
   padding: 1px 8px;
   border-radius: 999px;
   font-size: 11px;
@@ -98,6 +94,12 @@ body[data-dsh-skin-center] .delegatedStatus {
   font-size: 12px;
   line-height: 1.5;
   color: var(--dsw-alias-label-secondary, #6b7280);
+}
+
+body[data-dsh-skin-center] .delegatedLink {
+  align-self: flex-start;
+  font-size: 12px;
+  color: var(--dsw-alias-brand-primary, #1e63b8);
 }
 
 /* Delegated wallpaper plugin pointer (issue #39): a state notice that carries

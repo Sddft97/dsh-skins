@@ -100,6 +100,10 @@ export function SkinCenter({ t, runtime, theme, background, externalWallpaper, d
   const [shownBubbleOpacity, setShownBubbleOpacity] = useLiveValue(bubbleOpacity)
   const [shownBubbleBlur, setShownBubbleBlur] = useLiveValue(bubbleBlur)
   const catalog = useSyncExternalStore(runtime.subscribe, runtime.catalog)
+  // Delegated rows render as bars above the grid; the grid holds only the
+  // asset skins this package loads, each with a preview image to show.
+  const delegatedEntries = (catalog ?? []).filter(isDelegatedCatalogSkin)
+  const isAssetSkin = (entry: CatalogSkin): boolean => !isDelegatedCatalogSkin(entry)
   const state = useSyncExternalStore(runtime.subscribe, runtime.controller.getState)
   const customThemeState = useSyncExternalStore(customTheme.subscribe, customTheme.getState)
   const activeId = state.active
@@ -767,6 +771,33 @@ export function SkinCenter({ t, runtime, theme, background, externalWallpaper, d
                   {error !== null && <div className={css.error}>{error}</div>}
 
                   <div className={css.list}>
+                    {delegatedEntries.map(entry => {
+                      const id = entry.manifest.id
+                      // A delegated skin is selected through the same switch
+                      // engine as any other, and paints through its own
+                      // plugin; the row renders that plugin's state instead of
+                      // a preview image and an uninstall this card has no
+                      // route for. It sits ABOVE the grid, beside the
+                      // custom-theme row below it: the two looks this package
+                      // does not paint are the two it lists as bars, and the
+                      // grid is for the asset directories it does load.
+                      return (
+                        <DelegatedSkinCard
+                          key={id}
+                          t={t}
+                          skin={entry}
+                          theme={delegatedStates[id] ?? { live: false, canYield: false }}
+                          isActive={id === activeId && !previewing}
+                          isTrying={previewing && id === tryingId}
+                          busy={busyId === id}
+                          disabled={busyId !== null || uninstallingId !== null}
+                          onTryOn={() => { tryOn(entry) }}
+                          onExitTryOn={exitTryOn}
+                          onApply={() => { applySkin(id) }}
+                          onInstalled={() => { void runtime.refreshCatalog() }}
+                        />
+                      )
+                    })}
                     <div className={css.skinGrid}>
                     {(() => {
                       const isActive = activeId === null && !previewing && !customThemeState.applied
@@ -798,33 +829,10 @@ export function SkinCenter({ t, runtime, theme, background, externalWallpaper, d
                       )
                     })()}
 
-                    {(catalog ?? []).map(entry => {
+                    {(catalog ?? []).filter(isAssetSkin).map(entry => {
                       const id = entry.manifest.id
                       const isActive = id === activeId && !previewing
                       const isTrying = previewing && id === tryingId
-                      // A delegated skin is selected through the same switch
-                      // engine as any other, and paints through its own plugin;
-                      // the row renders that plugin's state instead of a
-                      // preview image and an uninstall this card has no route
-                      // for.
-                      if (isDelegatedCatalogSkin(entry)) {
-                        return (
-                          <DelegatedSkinCard
-                            key={id}
-                            t={t}
-                            skin={entry}
-                            theme={delegatedStates[id] ?? { live: false, canYield: false }}
-                            isActive={isActive}
-                            isTrying={isTrying}
-                            busy={busyId === id}
-                            disabled={busyId !== null || uninstallingId !== null}
-                            onTryOn={() => { tryOn(entry) }}
-                            onExitTryOn={exitTryOn}
-                            onApply={() => { applySkin(id) }}
-                            onInstalled={() => { void runtime.refreshCatalog() }}
-                          />
-                        )
-                      }
                       const badge = isActive ? t('active') : isTrying ? t('tryingOn') : null
                       const report = verifyReports[id]
                       // The thumbnail follows the live light/dark scheme, falling

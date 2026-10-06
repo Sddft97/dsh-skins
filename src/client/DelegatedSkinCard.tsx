@@ -8,6 +8,12 @@
  * installed, because an installed-and-enabled plugin that the card hid until
  * the user went to the store is a plugin nobody finds.
  *
+ * It is a full-width bar ABOVE the skin grid, not a tile among them: it has no
+ * preview image (the plugin paints, and this package holds no screenshot of
+ * it), so a tile sized for a 16:9 thumbnail would be mostly empty. The bar
+ * carries the same head / tagline / actions shape as the custom-theme card
+ * below the grid, so the two non-asset looks read as the same kind of row.
+ *
  * Three states, all read from two sources and never guessed:
  *
  *  - not installed: the one-click install through whichever plugin-management
@@ -90,6 +96,7 @@ export function DelegatedSkinCard(props: DelegatedSkinCardProps): ReactNode {
   const { t, skin, theme, isActive, isTrying, busy, disabled } = props
   const manifest = skin.manifest as CatalogSkin['manifest'] & { delegated: DelegatedPayload }
   const payload = manifest.delegated
+  const accent = manifest.accent ?? '#98a1ab'
   const faces = useSyncExternalStore(subscribeInstallFaces, getInstallFaces)
   const [installing, setInstalling] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -132,9 +139,10 @@ export function DelegatedSkinCard(props: DelegatedSkinCardProps): ReactNode {
         : t('delegatedSkinReady')
 
   return (
-    <div className={`${css.card} ${css.skinCard} ${css.delegatedCard}`} data-delegated-skin={manifest.id}>
-      <div className={css.thumbWrap}>
-        <div className={css.thumbEmpty} style={{ background: manifest.accent ?? '#98a1ab' }} aria-hidden="true" />
+    <div className={`${css.card} ${css.delegatedCard}`} data-delegated-skin={manifest.id}>
+      <div className={css.cardHead}>
+        <span className={css.swatch} style={{ background: accent }} aria-hidden="true" />
+        <span className={css.cardName} title={manifest.nameEn}>{manifest.nameEn}</span>
         <span className={css.delegatedBadge}>{t('delegatedSkinBadge')}</span>
         {(isActive || isTrying) && (
           <span className={`${css.badge} ${isActive && !isTrying ? css.badgeActive : css.badgeTrying}`}>
@@ -142,13 +150,11 @@ export function DelegatedSkinCard(props: DelegatedSkinCardProps): ReactNode {
           </span>
         )}
       </div>
-      <div className={css.cardHead}>
-        <span className={css.swatch} style={{ background: manifest.accent ?? '#98a1ab' }} aria-hidden="true" />
-        <span className={css.cardName} title={manifest.nameEn}>{manifest.nameEn}</span>
-      </div>
       <div className={css.cardTagline} title={manifest.tagline ?? ''}>{manifest.tagline ?? ''}</div>
       <p className={css.delegatedStatus} role="status">{status}</p>
-      {error !== null && <p className={css.delegatedStatus} role="alert">{t('delegatedSkinInstallFailed', { reason: error })}</p>}
+      {error !== null && (
+        <p className={css.delegatedStatus} role="alert">{t('delegatedSkinInstallFailed', { reason: error })}</p>
+      )}
       {payload.descriptorMatches === false && (
         <p className={css.delegatedStatus} role="alert">{t('delegatedSkinDescriptorMismatch')}</p>
       )}
@@ -195,7 +201,7 @@ export function DelegatedSkinCard(props: DelegatedSkinCardProps): ReactNode {
         )}
       </div>
       <a
-        className={css.externalWallpaperLink}
+        className={css.delegatedLink}
         href={payload.repository}
         target="_blank"
         rel="noopener noreferrer"
