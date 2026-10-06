@@ -349,6 +349,46 @@ describe('v2 hooks trust gate', () => {
 })
 
 describe('v2 asset route', () => {
+  it('serves video byte ranges and rejects invalid ranges', async () => {
+    writeFixtureSkin('harbor')
+    writeFileSync(join(builtin, 'harbor', 'assets', 'video.mp4'), '0123456789')
+    writeFileSync(join(builtin, 'harbor', 'assets', 'empty.mp4'), '')
+    const server = await serve(makeRoutes())
+    const asset = `${SKIN_CENTER_V2_PREFIX}/skins/harbor/assets/`
+    try {
+      const full = await call(server.port, 'GET', `${asset}video.mp4`)
+      expect(full.status).toBe(200)
+      expect(full.text).toBe('0123456789')
+      expect(full.headers['content-type']).toBe('video/mp4')
+      expect(full.headers['content-length']).toBe('10')
+      expect(full.headers['accept-ranges']).toBe('bytes')
+      for (const [range, text, contentRange] of [
+        ['bytes=2-5', '2345', 'bytes 2-5/10'],
+        ['bytes=7-', '789', 'bytes 7-9/10'],
+        ['bytes=-3', '789', 'bytes 7-9/10'],
+        ['bytes=7-99', '789', 'bytes 7-9/10'],
+        ['bytes=-99', '0123456789', 'bytes 0-9/10'],
+      ]) {
+        const partial = await call(server.port, 'GET', `${asset}video.mp4`, { headers: { range } })
+        expect(partial.status).toBe(206)
+        expect(partial.text).toBe(text)
+        expect(partial.headers['content-range']).toBe(contentRange)
+        expect(partial.headers['content-length']).toBe(String(text.length))
+      }
+      for (const range of ['bytes=10-', 'bytes=5-2', 'bytes=-0', 'bytes=-', 'bytes=0-1,3-4', 'bytes=9007199254740992-', 'invalid']) {
+        const refused = await call(server.port, 'GET', `${asset}video.mp4`, { headers: { range } })
+        expect(refused.status).toBe(416)
+        expect(refused.headers['content-range']).toBe('bytes */10')
+        expect(refused.text).toBe('')
+      }
+      const empty = await call(server.port, 'GET', `${asset}empty.mp4`, { headers: { range: 'bytes=0-' } })
+      expect(empty.status).toBe(416)
+      expect(empty.headers['content-range']).toBe('bytes */0')
+    } finally {
+      await server.close()
+    }
+  })
+
   it('serves in-directory assets with mime types', async () => {
     writeFixtureSkin('harbor')
     const server = await serve(makeRoutes())

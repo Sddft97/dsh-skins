@@ -121,15 +121,37 @@ function serveStylesheet(
 }
 
 /** Serve one static file from inside the skin directory (fail-closed). */
-function serveAsset(res: ServerResponse, entry: SkinCatalogEntry, relPath: string): void {
+function serveAsset(req: IncomingMessage, res: ServerResponse, entry: SkinCatalogEntry, relPath: string): void {
   const abs = resolveInsideSkin(entry, relPath)
   if (!abs || !existsSync(abs) || !statSync(abs).isFile()) {
     writeJson(res, 404, { ok: false, error: 'asset-not-found' })
     return
   }
   const mime = MIME[extname(abs).toLowerCase()] ?? 'application/octet-stream'
-  res.writeHead(200, { 'content-type': mime, 'cache-control': 'no-store' })
-  res.end(readFileSync(abs))
+  const body = readFileSync(abs)
+  const size = body.length
+  const headers = { 'content-type': mime, 'cache-control': 'no-store', 'accept-ranges': 'bytes' }
+  const range = req.headers.range
+  if (range !== undefined) {
+    const match = /^bytes=(\d*)-(\d*)$/.exec(range.trim())
+    let start = match?.[1] ? Number(match[1]) : 0
+    let end = match?.[2] ? Number(match[2]) : size - 1
+    if (match && !match[1] && match[2]) {
+      start = Math.max(0, size - Number(match[2]))
+      end = size - 1
+    }
+    if (!match || (!match[1] && !match[2]) || !Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start >= size || start > end || size === 0) {
+      res.writeHead(416, { ...headers, 'content-range': `bytes */${size}` })
+      res.end()
+      return
+    }
+    end = Math.min(end, size - 1)
+    res.writeHead(206, { ...headers, 'content-range': `bytes ${start}-${end}/${size}`, 'content-length': end - start + 1 })
+    res.end(body.subarray(start, end + 1))
+    return
+  }
+  res.writeHead(200, { ...headers, 'content-length': size })
+  res.end(body)
 }
 
 /**
@@ -325,7 +347,7 @@ export function makeSkinCenterV2Routes(deps: RoutesV2Deps = {}): WebRoute[] {
       return
     }
     if (sub.startsWith('assets/') || sub.startsWith('preview/')) {
-      serveAsset(res, entry, sub)
+      serveAsset(req, res, entry, sub)
       return
     }
     writeJson(res, 404, { ok: false, error: 'unknown-skin-resource' })
