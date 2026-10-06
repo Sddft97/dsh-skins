@@ -94,7 +94,37 @@ The card says so while it is standing down, so a paused skin reads as a state, n
 
 Skin background art is part of a skin own look, so it is withheld together with the rest of the skin while a wallpaper renders. Skins that ship their own full-bleed plate (the ground-plate canvases in the catalog) additionally key their yield rules on `body[data-we-wallpaper]`, so they step aside rather than compete for the backdrop.
 
-## Configuration
+## Delegated plugin skins
+
+Some looks are not asset directories at all: they ship as their own plugin and paint the whole
+interface. The Claude Code Desktop theme is one — it lives in [dsh-claude-style](https://github.com/Nwflower/dsh-claude-style)
+(`dsh-claude-style`), which repaints the shell, sidebar, composer and conversation on its own. It is a
+**separate package**: nothing here bundles it, versions it or ships its files.
+
+Such a look is still a **skin you can select**. It appears as its own row in the card, carries a
+`Plugin theme` badge, and behaves like any other skin: try it on, apply it, and it is remembered
+across a reload. What it never does is paint from here — the plugin paints it, and this package
+keeps the selection.
+
+- **The row exists before the plugin does.** Press **Install plugin** on the row (the same
+  one-click path the wallpaper notice uses: the official in-process plugin manager when the host
+  publishes it, the family plugin-manager face otherwise, the exact command when it publishes
+  neither). A profile without the plugin is exactly where the prompt belongs.
+- **Selecting it hands the page over.** The skin center stamps nothing, loads nothing and paints
+  nothing; the plugin's own client chain mounts its bundle. The selection persists like any other,
+  so the delegated look survives a restart.
+- **Any other skin, the stock look, or a running wallpaper takes the page back.** That is the
+  reverse of the same handoff: this package stamps `html[data-dsh-skin]` again, the plugin reads
+  it and stands its own visual down, and the skin paints over it. No reload, no re-apply.
+- **A build that cannot hand the page back is not offered.** The plugin advertises that it can
+  yield with a body attribute; without it, the row says so and offers no try-on or apply, because
+  the two would otherwise paint the same shell at once. Update the plugin and the row becomes
+  selectable.
+- **Its settings page and preferences survive the yield.** Standing down is a visual state, not an
+  uninstall: the plugin keeps its own settings page while another skin is on screen.
+
+The skin center reads the plugin's markers and never writes them, and the plugin never writes
+`data-dsh-skin`. Neither side can strand the other.## Configuration
 
 - **Enable switch**: turns the whole card (try-on / apply / background controls) on or off; persisted in the v2 active-state document.
 - **Background sliders**: occlusion (0–100%), two backdrop blur radii, input-card blur (0–20 px), and bubble opacity (0–100%); persisted in the same v2 document.

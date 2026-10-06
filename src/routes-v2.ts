@@ -38,6 +38,7 @@ import { transformSkinCss, SkinCssSafetyError } from './core/css-safety/transfor
 import { canServeSkinHooks, findSkin, loadSkinCatalog, repairSkin, resolveInsideSkin, shippedSkinIds, uninstallUserSkin, verifyAllSkinsIntegrity, verifyAndRepairAllSkins } from './skin-repo.ts'
 import { MARKET_PROVENANCE_FILENAME } from './provenance.ts'
 import { detectExternalWallpaperEngine, type ExternalWallpaperReport } from './external-wallpaper.ts'
+import { delegatedSkinRows, findDelegatedSkin, type DelegatedSkinRow } from './core/delegated-skins.ts'
 import type { SkinCatalog, SkinCatalogEntry } from './skin-repo.ts'
 
 export const SKIN_CENTER_V2_PREFIX = '/api/skin-center/v2'
@@ -80,6 +81,29 @@ export interface RoutesV2Deps {
    * the profile this package is installed into; tests hand in a fixed report.
    */
   detectExternalWallpaper?: () => ExternalWallpaperReport
+  /**
+   * Delegated-skin rows (a skin whose visual is another plugin's). The real
+   * builder probes this profile per registry entry; tests hand in fixed rows.
+   */
+  listDelegatedSkins?: () => DelegatedSkinRow[]
+}
+
+/**
+ * Whether a persisted selection still names something this package can show.
+ *
+ * Two kinds of selection exist: an asset skin in the catalog, and a delegated
+ * skin whose visual belongs to another plugin (core/delegated-skins.ts). The
+ * delegated ids come from this package's own registry rather than the catalog,
+ * so they resolve with or without that plugin installed: the row is the
+ * install prompt, and a selection that names it is the user having chosen it.
+ * Anything else is a selection whose files are gone, which resolves to the
+ * stock look instead of stranding the page on a missing id.
+ * @param catalog - the current catalog snapshot.
+ * @param id - a persisted selection value.
+ * @returns true when the selection can still be applied.
+ */
+function selectionResolves(catalog: SkinCatalog, id: string): boolean {
+  return findDelegatedSkin(id) !== null || findSkin(catalog, id) !== null
 }
 
 function sendCss(res: ServerResponse, status: number, code: string): void {
@@ -165,24 +189,58 @@ export function makeSkinCenterV2Routes(deps: RoutesV2Deps = {}): WebRoute[] {
   // installed, builtins only when the package ships them (files whitelist).
   const shippedSet = (deps.shippedSkinIds ?? shippedSkinIds)()
 
+  const listDelegatedSkins = deps.listDelegatedSkins ?? (() => delegatedSkinRows())
+
+  /** One catalog row per delegated skin, shaped like an asset skin's. */
+  const delegatedCatalogRows = (): Array<Record<string, unknown>> => listDelegatedSkins().map((row) => ({
+    origin: 'delegated',
+    warnings: row.descriptorMatches === false
+      ? ['delegated-descriptor-mismatch']
+      : [],
+    manifest: {
+      id: row.descriptor.id,
+      name: row.descriptor.name,
+      nameEn: row.descriptor.nameEn,
+      tagline: row.descriptor.tagline,
+      accent: row.descriptor.accent,
+      // The delegated plugin's own identity and state, all the card needs and
+      // nothing it can act on beyond the one-click install.
+      delegated: {
+        package: row.descriptor.package,
+        repository: row.descriptor.repository,
+        installCommand: row.descriptor.installCommand,
+        bodyAttr: row.descriptor.bodyAttr,
+        handoffAttr: row.descriptor.handoffAttr,
+        wiringId: row.descriptor.wiringId,
+        installed: row.installed,
+        signals: row.signals,
+        descriptorMatches: row.descriptorMatches,
+      },
+    },
+  }))
+
   const catalogHandler: WebRoute['handler'] = (_req, res) => {
     const catalog = loadCatalog()
     writeJson(res, 200, {
       ok: true,
       capturedAt: catalog.capturedAt,
-      skins: catalog.skins
-        .filter((s) => s.origin === 'user' || shippedSet.has(s.manifest.id))
-        .map((s) => ({
-          origin: s.origin,
-          warnings: s.warnings,
-          manifest: s.manifest,
-          // Anonymous install-channel hint for telemetry (docs/telemetry.md):
-          // Workshop installs carry a provenance file, registry installs do
-          // not. This is a statistical hint only, never a security signal.
-          channel: s.origin === 'user'
-            ? (existsSync(join(s.dir, MARKET_PROVENANCE_FILENAME)) ? 'market' : 'unknown')
-            : 'npm',
-        })),
+      skins: [
+        ...catalog.skins
+          .filter((s) => s.origin === 'user' || shippedSet.has(s.manifest.id))
+          .map((s) => ({
+            origin: s.origin,
+            warnings: s.warnings,
+            manifest: s.manifest,
+            // Anonymous install-channel hint for telemetry (docs/telemetry.md):
+            // Workshop installs carry a provenance file, registry installs do
+            // not. This is a statistical hint only, never a security signal.
+            channel: s.origin === 'user'
+              ? (existsSync(join(s.dir, MARKET_PROVENANCE_FILENAME)) ? 'market' : 'unknown')
+              : 'npm',
+          })),
+        // Delegated skins carry no files of their own, so they have no channel.
+        ...delegatedCatalogRows(),
+      ],
       diagnostics: catalog.diagnostics,
     })
   }
@@ -356,7 +414,9 @@ export function makeSkinCenterV2Routes(deps: RoutesV2Deps = {}): WebRoute[] {
   const activeGetHandler: WebRoute['handler'] = (_req, res) => {
     const state = readActiveState(activeStatePath)
     const catalog = loadCatalog()
-    const effectiveActive = state.active !== null && !findSkin(catalog, state.active) ? null : state.active
+    const effectiveActive = state.active !== null && !selectionResolves(catalog, state.active)
+      ? null
+      : state.active
     writeJson(res, 200, { ok: true, active: effectiveActive, background: state.background })
   }
 
@@ -390,7 +450,7 @@ export function makeSkinCenterV2Routes(deps: RoutesV2Deps = {}): WebRoute[] {
       writeJson(res, 400, { ok: false, error: 'active-must-be-string-or-null' })
       return
     }
-    if (typeof active === 'string' && !findSkin(loadCatalog(), active)) {
+    if (typeof active === 'string' && !selectionResolves(loadCatalog(), active)) {
       writeJson(res, 404, { ok: false, error: 'skin-not-found' })
       return
     }

@@ -41,7 +41,10 @@ import {
 } from './runtime/external-wallpaper-engine.ts'
 import { PREDICTED_WALLPAPER_GRACE_MS } from '../core/wallpaper-handoff.ts'
 import { setComposerFrostSuppressed } from './runtime/backdrop-scene.ts'
-import { bridgeWallpaperInstallFaces } from './external-wallpaper-install.ts'
+import { bridgeInstallFaces } from './plugin-install-faces.ts'
+import { createDelegatedSkinHandle } from './delegated-skin-handle.ts'
+import { delegatedThemeState, watchDelegatedTheme, type DelegatedThemeState } from './runtime/delegated-theme.ts'
+import { DELEGATED_SKINS } from '../core/delegated-skins.ts'
 import { EXTERNAL_WE_PLUGIN, EXTERNAL_WE_REPO } from '../external-wallpaper.ts'
 import { en, zh, type SkinCenterKey } from './locales.ts'
 import { bootSkinRuntime, watchPersistedSelection } from './runtime/boot.ts'
@@ -274,10 +277,31 @@ export function apply(ctx: ClientContext): void {
     settingsSection<CustomThemeConfig>(settings, SKIN_CUSTOM_THEME_NS),
   )
   ctx.effect(() => () => customTheme.dispose(), 'ui-skin-center: custom theme dispose')
-  // One-click install of the delegated plugin (issue #39): bridge whichever
-  // plugin-management face the host publishes. Both are optional, so neither
-  // gates this plugin's activation.
-  bridgeWallpaperInstallFaces(ctx)
+  // One-click install of the delegated plugins (issue #39, and the
+  // delegated-skin rows): bridge whichever plugin-management face the host
+  // publishes. Both are optional, so neither gates this plugin's activation.
+  bridgeInstallFaces(ctx)
+
+  // Delegated skins: a skin whose visual is another plugin's. This package
+  // paints none of it, so the card's row is driven by that plugin's own
+  // document markers. One observer per registered plugin, read-only, and torn
+  // down with this fiber.
+  const delegatedStates = new Map<string, DelegatedThemeState>()
+  const delegatedListeners = new Set<() => void>()
+  for (const descriptor of DELEGATED_SKINS) {
+    delegatedStates.set(descriptor.id, delegatedThemeState(document, descriptor))
+  }
+  ctx.effect(() => {
+    const stops = DELEGATED_SKINS.map((descriptor) => watchDelegatedTheme(
+      document,
+      { bodyAttr: descriptor.bodyAttr, handoffAttr: descriptor.handoffAttr },
+      (state) => {
+        delegatedStates.set(descriptor.id, state)
+        for (const listener of delegatedListeners) listener()
+      },
+    ))
+    return () => { for (const stop of stops) stop() }
+  }, 'ui-skin-center: delegated theme interop')
   // The external Wallpaper Engine plugin owns wallpapers now (issue #39).
   // While it renders one, its `body[data-we-wallpaper]` marker stands this
   // plugin's own visual work down ENTIRELY: no skin CSS, no background art, no
@@ -409,6 +433,13 @@ export function apply(ctx: ClientContext): void {
       repository: EXTERNAL_WE_REPO,
       packageName: EXTERNAL_WE_PLUGIN,
     },
+    delegated: createDelegatedSkinHandle(
+      (id) => delegatedStates.get(id) ?? { live: false, canYield: false },
+      (listener) => {
+        delegatedListeners.add(listener)
+        return () => { delegatedListeners.delete(listener) }
+      },
+    ),
   })
 
   // First-level settings section: the Skin Center card as its own top-level

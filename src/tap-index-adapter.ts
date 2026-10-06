@@ -22,6 +22,7 @@ import { findSkin, loadSkinCatalog } from './skin-repo.ts'
 import type { SkinCatalog } from './skin-repo.ts'
 import { SKIN_CENTER_V2_PREFIX } from './routes-v2.ts'
 import { WALLPAPER_EXPECTED_ATTR } from './core/wallpaper-handoff.ts'
+import { isDelegatedSkinId } from './core/delegated-skins.ts'
 
 export interface SkinIndexTapDeps {
   readActiveId: () => string | null
@@ -113,6 +114,12 @@ export function makeSkinIndexRows(deps: SkinIndexTapDeps): () => IndexInjection[
     try {
       const active = deps.readActiveId()
       if (!active) return []
+      // A delegated skin paints nothing here: the plugin that owns the page
+      // mounts its own bundle from its own client chain, and the stamp below is
+      // precisely the signal that tells it to stand down. Injecting a
+      // stylesheet row for it would fail the catalog lookup below and warn
+      // about a skin that is not missing, it is delegated.
+      if (isDelegatedSkinId(active)) return []
       // The wallpaper owns this screen (issue #51): rows are the anti-FOUC half
       // of the injection, so withholding them is what keeps the first paint
       // off the skin. The runtime still holds the verdict.
@@ -154,12 +161,17 @@ export function makeSkinIndexTap(deps: SkinIndexTapDeps): (html: string) => stri
     try {
       const active = deps.readActiveId()
       if (!active) return html
+      // A delegated skin is the stock look on the first screen, and the
+      // delegated plugin paints it from its own client chain. Stamping
+      // html[data-dsh-skin] here would be the opposite message: that plugin
+      // reads the stamp to stand down. Leaving it off is the whole handoff.
+      if (isDelegatedSkinId(active)) return html
       // Same first-screen pre-judgment as the rows above (issue #51), on the
       // raw tap: it is the half that stamps the opening html tag, and a
       // document that reaches the browser already carrying a wallpaper must
       // not reach it carrying the skin either. The document is marked as
       // withheld-for-prediction so the browser half's boot activation stands
-      // down too, and releases that mark once the peer's marker answers.
+      // down too, and releases that mark once the peer answers.
       if (wallpaperOnStage()) return stampWallpaperExpected(html)
       const catalog = loadCatalog()
       const entry = findSkin(catalog, active)

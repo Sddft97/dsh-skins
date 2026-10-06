@@ -14,15 +14,19 @@
  * official theme service (persisted, same as the Appearance row).
  */
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import type { DelegatedThemeState } from './runtime/delegated-theme.ts'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
 import type { SkinActivationOptions } from './runtime/skin-controller.ts'
 import type { CatalogSkin, SkinRuntimeStore } from './runtime/boot.ts'
+import { isDelegatedCatalogSkin } from './runtime/boot.ts'
 import type { SkinBackgroundHandle } from './background.ts'
 import type { ExternalWallpaperHandle } from './external-wallpaper-handle.ts'
 import type { PreviewCoordinator } from './preview-coordinator.ts'
 import type { CustomThemeController } from './custom-theme-controller.ts'
 import { ExternalWallpaperNotice } from './ExternalWallpaperNotice.tsx'
+import { DelegatedSkinCard } from './DelegatedSkinCard.tsx'
+import { createDelegatedSkinHandle, type DelegatedSkinHandle } from './delegated-skin-handle.ts'
 import { CustomThemeCard } from './CustomThemePanel.tsx'
 import { SliderControl } from './SliderControl.tsx'
 import css from './skin-center.module.css'
@@ -40,6 +44,8 @@ export interface SkinCenterInjected {
   background: SkinBackgroundHandle
   /** The delegated Wallpaper Engine plugin this card points at (issue #39). */
   externalWallpaper: ExternalWallpaperHandle
+  /** Skins whose visual is another plugin's (see core/delegated-skins.ts). */
+  delegated: DelegatedSkinHandle
   /** One serialized preview session shared by skins, wallpapers and themes. */
   preview: PreviewCoordinator
   /** User palette derived from the official stock theme. */
@@ -52,6 +58,12 @@ export type SkinCenterComponentProps =
 
 /** The apply target of the official stock-look card. */
 const OFFICIAL = 'official'
+
+/** Stand-in for a host that injects no delegated-skin face: nothing is live. */
+const INERT_DELEGATED = createDelegatedSkinHandle(
+  () => ({ live: false, canYield: false }),
+  () => () => {},
+)
 
 /**
  * Live-label helper: the shown value follows the in-drag thumb immediately,
@@ -72,7 +84,7 @@ function useLiveValue(value: number): [number, (v: number | null) => void] {
  * @param props - card props.
  * @returns the plugin card.
  */
-export function SkinCenter({ t, runtime, theme, background, externalWallpaper, preview, customTheme }: SkinCenterComponentProps) {
+export function SkinCenter({ t, runtime, theme, background, externalWallpaper, delegated, preview, customTheme }: SkinCenterComponentProps) {
   const snapshot = useSyncExternalStore((listener) => theme.subscribe(listener), () => theme.getTheme())
   const enabled = useSyncExternalStore(background.subscribe, background.enabled)
   const opacity = useSyncExternalStore(background.subscribe, background.opacity)
@@ -94,7 +106,21 @@ export function SkinCenter({ t, runtime, theme, background, externalWallpaper, p
   const previewing = state.previewing
   const tryingId = state.trying
   const activeEntry = activeId === null ? null : runtime.find(activeId)
-  const backdropActive = activeEntry?.manifest.contributes.backgroundMedia !== undefined
+  const backdropActive = activeEntry?.manifest.contributes?.backgroundMedia !== undefined
+  // A delegated row re-renders on the plugin's own markers, not on the catalog.
+  // The handle is a pure read, so a host that renders the card without it
+  // gets every delegated row reported as not running rather than a blank card.
+  const delegatedSkins = delegated ?? INERT_DELEGATED
+  const [delegatedStates, setDelegatedStates] = useState<Record<string, DelegatedThemeState>>({})
+  useEffect(() => {
+    const read = (): void => {
+      const next: Record<string, DelegatedThemeState> = {}
+      for (const id of delegatedSkins.ids()) next[id] = delegatedSkins.state(id)
+      setDelegatedStates(next)
+    }
+    read()
+    return delegatedSkins.subscribe(read)
+  }, [delegatedSkins])
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [verifying, setVerifying] = useState(false)
@@ -776,6 +802,29 @@ export function SkinCenter({ t, runtime, theme, background, externalWallpaper, p
                       const id = entry.manifest.id
                       const isActive = id === activeId && !previewing
                       const isTrying = previewing && id === tryingId
+                      // A delegated skin is selected through the same switch
+                      // engine as any other, and paints through its own plugin;
+                      // the row renders that plugin's state instead of a
+                      // preview image and an uninstall this card has no route
+                      // for.
+                      if (isDelegatedCatalogSkin(entry)) {
+                        return (
+                          <DelegatedSkinCard
+                            key={id}
+                            t={t}
+                            skin={entry}
+                            theme={delegatedStates[id] ?? { live: false, canYield: false }}
+                            isActive={isActive}
+                            isTrying={isTrying}
+                            busy={busyId === id}
+                            disabled={busyId !== null || uninstallingId !== null}
+                            onTryOn={() => { tryOn(entry) }}
+                            onExitTryOn={exitTryOn}
+                            onApply={() => { applySkin(id) }}
+                            onInstalled={() => { void runtime.refreshCatalog() }}
+                          />
+                        )
+                      }
                       const badge = isActive ? t('active') : isTrying ? t('tryingOn') : null
                       const report = verifyReports[id]
                       // The thumbnail follows the live light/dark scheme, falling
@@ -892,7 +941,7 @@ export type SkinCenterSectionProps =
 
 /** Render the skin-center card as a first-level settings page. */
 export function SkinCenterSection(props: SkinCenterSectionProps): ReactNode {
-  const { t, runtime, theme, background, externalWallpaper, preview, customTheme } = props
+  const { t, runtime, theme, background, externalWallpaper, delegated, preview, customTheme } = props
   return (
     <ul className={css.sectionList}>
       <SkinCenter
@@ -901,6 +950,7 @@ export function SkinCenterSection(props: SkinCenterSectionProps): ReactNode {
         theme={theme}
         background={background}
         externalWallpaper={externalWallpaper}
+        delegated={delegated}
         preview={preview}
         customTheme={customTheme}
       />

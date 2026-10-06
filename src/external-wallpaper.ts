@@ -12,21 +12,15 @@
  * This module is the READ-ONLY half of that relationship: it reports whether
  * the external plugin is installed in this profile, so the card can point the
  * user at it instead of offering a wallpaper feature of its own. It never
- * installs, removes, disables or rewrites anything — installation is the
- * user's, performed with the official CLI.
+ * installs, removes, disables or rewrites anything; installation is the user's,
+ * performed through the official plugin manager.
  *
- * Detection is best-effort by construction: the profile layout, a hand-edited
- * patch file and a remote install all move under it, so every read is fenced
- * and a missing or unreadable input simply means "not installed".
+ * The reads themselves are the shared profile probe
+ * (core/profile-plugin-probe.ts), which the delegated-skin registry asks the
+ * same questions. This file keeps the wallpaper-specific constants, the report
+ * shape, and the peer's own persisted selection read.
  *
- * Signals, any of which is enough:
- *  - the profile manifest's dependencies name the package (npm/registry and
- *    `link:` installs both land here);
- *  - any patch layer reachable from the harness home carries a row naming the
- *    package (the plugin-manager write, including rows the manifest no longer
- *    backs).
- *
- * The second read here is the FIRST-SCREEN prediction (issue #51). The runtime
+ * That persisted read is the FIRST-SCREEN prediction (issue #51). The runtime
  * withholds the skin off `body[data-we-wallpaper]`, which that plugin stamps
  * from its own client chain a few hundred milliseconds into the boot - later
  * than the browser's first paint, which the document itself decides. So the
@@ -38,11 +32,20 @@
  * @module @linxin666/dsh-client-ui-skin-center/external-wallpaper
  */
 
-import { existsSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
-import { firstNonBlank, resolveHarnessPaths } from './harness-home.ts'
+import {
+  SIGNAL_CORDIS_ROW,
+  SIGNAL_PROFILE_DEPENDENCY,
+  detectProfilePlugin,
+  manifestNamesPlugin,
+  patchNamesPlugin,
+  profilePluginPaths,
+  readJsonIfFile,
+  type ProfilePluginPaths,
+} from './core/profile-plugin-probe.ts'
+import { firstNonBlank } from './harness-home.ts'
 
 /** The delegated wallpaper plugin this package interoperates with. */
 export const EXTERNAL_WE_PLUGIN = 'dsh-plugin-wallpaper-engine'
@@ -69,42 +72,7 @@ export interface ExternalWallpaperReport {
   npm: string
 }
 
-/** Signal names, stable enough to assert on and to log. */
-export const SIGNAL_PROFILE_DEPENDENCY = 'profile-dependency'
-export const SIGNAL_CORDIS_ROW = 'cordis-row'
-
-/**
- * Read one file, or null when it is absent, a directory, or unreadable.
- * @param path - absolute path to read.
- * @returns the file's UTF-8 text, or null.
- */
-function readIfFile(path: string): string | null {
-  try {
-    if (!existsSync(path)) return null
-    if (!statSync(path).isFile()) return null
-    return readFileSync(path, 'utf8')
-  } catch {
-    return null
-  }
-}
-
-/**
- * Read one JSON file into an object, or null when it is absent or invalid.
- * @param path - absolute path to read.
- * @returns the parsed object, or null.
- */
-function readJsonIfFile(path: string): Record<string, unknown> | null {
-  const text = readIfFile(path)
-  if (text === null) return null
-  try {
-    const parsed: unknown = JSON.parse(text)
-    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : null
-  } catch {
-    return null
-  }
-}
+export { SIGNAL_CORDIS_ROW, SIGNAL_PROFILE_DEPENDENCY }
 
 /**
  * Whether a package.json dependency map names the delegated plugin.
@@ -120,13 +88,7 @@ export function manifestNamesExternalWallpaper(
   manifest: Record<string, unknown> | null,
   packageName: string = EXTERNAL_WE_PLUGIN,
 ): boolean {
-  if (manifest === null) return false
-  for (const section of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
-    const map = manifest[section]
-    if (typeof map !== 'object' || map === null || Array.isArray(map)) continue
-    if (Object.prototype.hasOwnProperty.call(map, packageName)) return true
-  }
-  return false
+  return manifestNamesPlugin(manifest, packageName)
 }
 
 /**
@@ -146,20 +108,11 @@ export function patchNamesExternalWallpaper(
   patch: string | null,
   packageName: string = EXTERNAL_WE_PLUGIN,
 ): boolean {
-  if (patch === null) return false
-  // Quote style varies (yaml may keep 'x', "x" or x); match the scalar
-  // anywhere on a line rather than pinning one quoting convention.
-  const pattern = new RegExp(`(^|[^a-z0-9._-])${packageName.replace(/\./g, '\\.')}([^a-z0-9._-]|$)`)
-  return patch.split(/\r?\n/).some((line) => pattern.test(line.replace(/#.*$/, '')))
+  return patchNamesPlugin(patch, packageName)
 }
 
 /** Paths the probe reads, resolved once. */
-export interface ExternalWallpaperPaths {
-  /** The active profile's package.json (dependency signal). */
-  profileManifestPath: string
-  /** Patch layers that may carry a wiring row (row signal). */
-  patchPaths: string[]
-}
+export type ExternalWallpaperPaths = ProfilePluginPaths
 
 /**
  * Resolve the files the probe reads for a harness home / profile pair. The
@@ -172,16 +125,7 @@ export interface ExternalWallpaperPaths {
 export function externalWallpaperPaths(
   options: { home?: string; profile?: string } = {},
 ): ExternalWallpaperPaths {
-  const paths = resolveHarnessPaths(options.home, options.profile)
-  const profileDir = join(paths.patchPath, '..')
-  return {
-    profileManifestPath: paths.profileManifestPath,
-    patchPaths: [
-      paths.patchPath,
-      paths.legacyPatchPath,
-      join(profileDir, 'cordis.yml'),
-    ],
-  }
+  return profilePluginPaths(options)
 }
 
 /**
@@ -195,22 +139,10 @@ export function externalWallpaperPaths(
 export function detectExternalWallpaperEngine(
   options: { home?: string; profile?: string } = {},
 ): ExternalWallpaperReport {
-  const signals: string[] = []
-  try {
-    const paths = externalWallpaperPaths(options)
-    if (manifestNamesExternalWallpaper(readJsonIfFile(paths.profileManifestPath))) {
-      signals.push(SIGNAL_PROFILE_DEPENDENCY)
-    }
-    if (paths.patchPaths.some((path) => patchNamesExternalWallpaper(readIfFile(path)))) {
-      signals.push(SIGNAL_CORDIS_ROW)
-    }
-  } catch {
-    // Fail closed to "not installed": a broken probe must never be the reason
-    // the card tells the user to install something they already have.
-  }
+  const probe = detectProfilePlugin(EXTERNAL_WE_PLUGIN, options)
   return {
-    installed: signals.length > 0,
-    signals,
+    installed: probe.installed,
+    signals: probe.signals,
     packageName: EXTERNAL_WE_PLUGIN,
     repository: EXTERNAL_WE_REPO,
     installCommand: EXTERNAL_WE_INSTALL_COMMAND,

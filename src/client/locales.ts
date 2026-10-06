@@ -19,6 +19,16 @@ export type SkinCenterKey =
   | 'externalWallpaperCopyCommand'
   | 'externalWallpaperCopied'
   | 'externalWallpaperInstallFailed'
+  | 'delegatedSkinBadge'
+  | 'delegatedSkinMissing'
+  | 'delegatedSkinNotRunning'
+  | 'delegatedSkinNoHandoff'
+  | 'delegatedSkinReady'
+  | 'delegatedSkinInstall'
+  | 'delegatedSkinInstalling'
+  | 'delegatedSkinInstallFailed'
+  | 'delegatedSkinDescriptorMismatch'
+  | 'delegatedSkinLink'
   | 'stoodDownTitle'
   | 'stoodDownBody'
   | 'enabled'
@@ -171,6 +181,16 @@ export const en: Record<SkinCenterKey, string> = {
   externalWallpaperCopyCommand: 'Copy command',
   externalWallpaperCopied: 'Copied',
   externalWallpaperInstallFailed: 'Install failed: {reason}',
+  delegatedSkinBadge: 'Plugin theme',
+  delegatedSkinMissing: 'Not installed. This look comes from the {package} plugin.',
+  delegatedSkinNotRunning: 'The plugin is installed but not running here. Enable it in Plugins, then reopen this page.',
+  delegatedSkinNoHandoff: 'The running plugin build cannot hand the page back to a skin, so it cannot be selected from here. Update dsh-claude-style.',
+  delegatedSkinReady: 'The plugin paints this look. Any other skin, the default look or a wallpaper takes the page back.',
+  delegatedSkinInstall: 'Install plugin',
+  delegatedSkinInstalling: 'Installing...',
+  delegatedSkinInstallFailed: 'Install failed: {reason}',
+  delegatedSkinDescriptorMismatch: 'The installed plugin declares a different skin id or attribute than this card knows. Update the plugin.',
+  delegatedSkinLink: 'Open the plugin docs',
   stoodDownTitle: 'Skin paused while the wallpaper is active',
   stoodDownBody: 'Your skin is still selected, but it is not painted while the wallpaper plugin renders a wallpaper: the two cannot share the backdrop. Stop the wallpaper there and the skin comes back on its own.',
   enabled: 'Enable skin center',
@@ -324,6 +344,16 @@ export const zh: Record<SkinCenterKey, string> = {
   externalWallpaperCopyCommand: '复制命令',
   externalWallpaperCopied: '已复制',
   externalWallpaperInstallFailed: '安装失败：{reason}',
+  delegatedSkinBadge: '插件皮肤',
+  delegatedSkinMissing: '尚未安装。这套外观由 {package} 插件提供。',
+  delegatedSkinNotRunning: '插件已安装但当前页面没有运行。请在「插件」中启用它，然后刷新本页。',
+  delegatedSkinNoHandoff: '当前运行的插件版本无法在皮肤之间让出页面，因此这里不能选用它。请更新 dsh-claude-style。',
+  delegatedSkinReady: '该插件负责绘制这套外观。切换到其他皮肤、官方默认或壁纸时，页面会自动交还给它们。',
+  delegatedSkinInstall: '一键安装插件',
+  delegatedSkinInstalling: '安装中…',
+  delegatedSkinInstallFailed: '安装失败：{reason}',
+  delegatedSkinDescriptorMismatch: '已安装的插件声明的皮肤 id 或属性与本卡片记录的不一致，请更新插件。',
+  delegatedSkinLink: '打开插件文档',
   stoodDownTitle: '壁纸启用期间皮肤已暂停',
   stoodDownBody: '你选择的皮肤仍然保留，但在壁纸插件渲染壁纸期间不会绘制：两者的背景无法共存。在该插件里停止壁纸，皮肤会自动恢复。',
   enabled: '启用皮肤中心',

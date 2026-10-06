@@ -20,9 +20,16 @@ import { setComposerFrostSuppressed } from './backdrop-scene.ts'
 import { createSkinController } from './skin-controller.ts'
 import type { ControllerSkinEntry, SkinController } from './skin-controller.ts'
 
-/** Display-ready catalog entry (manifest + origin), as served by /v2/catalog. */
+/**
+ * Display-ready catalog entry (manifest + origin), as served by /v2/catalog.
+ *
+ * `origin: 'delegated'` rows are skins whose visual is another plugin's: they
+ * carry a `delegated` payload and no `contributes`. The card renders them as
+ * their own row and the controller withholds their paint (see
+ * skin-controller.ts); everything else about them behaves like an asset skin.
+ */
 export interface CatalogSkin {
-  origin: 'builtin' | 'user'
+  origin: 'builtin' | 'user' | 'delegated'
   warnings: string[]
   manifest: ControllerSkinEntry['manifest'] & {
     name: string
@@ -37,6 +44,11 @@ export interface CatalogSkin {
     preview?: { light: string; dark: string }
     tags?: string[]
   }
+}
+
+/** A catalog row whose visual belongs to a delegated plugin. */
+export function isDelegatedCatalogSkin(skin: CatalogSkin): boolean {
+  return skin.manifest.delegated !== undefined
 }
 
 export interface CatalogDiagnostic {
@@ -200,6 +212,10 @@ export function bootSkinRuntime(options: BootOptions = {}): SkinRuntimeStore {
       if (active === null) return
       let entry = store.find(active)
       if (entry === null) {
+        // A selection no catalog row answers for: its files are gone, or it
+        // names a delegated skin this build does not know. A delegated row is
+        // listed whether or not its plugin is installed, so it resolves here
+        // and only a truly unknown id lands on this fallback.
         const defaultEntry = store.find('blue-fantasy')
         if (defaultEntry !== null) {
           await controller.adopt('blue-fantasy', defaultEntry as ControllerSkinEntry)

@@ -109,11 +109,15 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true })
 })
 
-function makeRoutes() {
+function makeRoutes(overrides: Parameters<typeof makeSkinCenterV2Routes>[0] = {}) {
   return makeSkinCenterV2Routes({
     loadCatalog: () => loadSkinCatalog({ builtinDir: builtin, userDir: join(root, 'user') }),
     activeStatePath: statePath,
     shippedSkinIds: () => new Set(['harbor', 'plain', 'patched', 'hooked', 'evil']),
+    // The asset-skin cases below are about the installed-only filter; a
+    // delegated row is a different kind of entry and has its own cases.
+    listDelegatedSkins: () => [],
+    ...overrides,
   })
 }
 
@@ -162,11 +166,105 @@ describe('v2 catalog installed-only filter', () => {
       loadCatalog: () => loadSkinCatalog({ builtinDir: builtin, userDir }),
       activeStatePath: statePath,
       shippedSkinIds: () => new Set(['stock']),
+      listDelegatedSkins: () => [],
     })
     const server = await serve(routes)
     const res = await call(server.port, 'GET', `${SKIN_CENTER_V2_PREFIX}/catalog`)
     expect(res.status).toBe(200)
     expect(res.jsonBody.skins.map((s: { manifest: { id: string } }) => s.manifest.id)).toEqual(['hatch', 'stock'])
+    await server.close()
+  })
+})
+
+
+describe('v2 delegated-skin routes', () => {
+  /** One delegated row, as the registry builds it for a profile without it. */
+  const row = (installed: boolean) => ({
+    descriptor: {
+      id: 'claude-style',
+      package: 'dsh-claude-style',
+      repository: 'https://github.com/Nwflower/dsh-claude-style',
+      installCommand: 'dsh plugin --profile web add dsh-claude-style',
+      bodyAttr: 'data-dsh-claude-style',
+      handoffAttr: 'data-dsh-claude-style-handoff',
+      wiringId: 'ui-skin-claude-style',
+      name: 'Claude Code Style',
+      nameEn: 'Claude Code Style',
+      tagline: 'Claude Code Desktop theme',
+      accent: '#d97757',
+    },
+    installed,
+    signals: installed ? ['profile-dependency'] : [],
+    descriptorMatches: null,
+  })
+
+  it('lists a delegated skin beside the asset skins, uninstalled or not', async () => {
+    // Given a profile with no delegated plugin installed
+    writeFixtureSkin('harbor')
+    const server = await serve(makeRoutes({ listDelegatedSkins: () => [row(false)] }))
+
+    // When the card reads the catalog
+    const res = await call(server.port, 'GET', `${SKIN_CENTER_V2_PREFIX}/catalog`)
+
+    // Then the row is present, with the identity and install wiring it needs
+    expect(res.status).toBe(200)
+    const delegated = res.jsonBody.skins.find((s: { origin: string }) => s.origin === 'delegated')
+    expect(delegated.manifest.id).toBe('claude-style')
+    expect(delegated.manifest.nameEn).toBe('Claude Code Style')
+    expect(delegated.manifest.delegated.package).toBe('dsh-claude-style')
+    expect(delegated.manifest.delegated.installed).toBe(false)
+    expect(delegated.manifest.delegated.handoffAttr).toBe('data-dsh-claude-style-handoff')
+    // And it carries no asset fields, so nothing tries to serve files for it
+    expect(delegated.manifest.contributes).toBeUndefined()
+    await server.close()
+  })
+
+  it('carries the install state and a descriptor mismatch as a catalog warning', async () => {
+    // Given an installed plugin whose descriptor this build does not recognize
+    writeFixtureSkin('harbor')
+    const server = await serve(makeRoutes({
+      listDelegatedSkins: () => [{ ...row(true), descriptorMatches: false }],
+    }))
+
+    // When the card reads the catalog
+    const res = await call(server.port, 'GET', `${SKIN_CENTER_V2_PREFIX}/catalog`)
+
+    // Then the mismatch is visible to the card instead of silently trusted
+    const delegated = res.jsonBody.skins.find((s: { origin: string }) => s.origin === 'delegated')
+    expect(delegated.manifest.delegated.installed).toBe(true)
+    expect(delegated.manifest.delegated.signals).toEqual(['profile-dependency'])
+    expect(delegated.manifest.delegated.descriptorMatches).toBe(false)
+    expect(delegated.warnings).toContain('delegated-descriptor-mismatch')
+    await server.close()
+  })
+
+  it('accepts a delegated id as the persisted selection', async () => {
+    // Given a profile that selected a delegated skin
+    writeFixtureSkin('harbor')
+    const server = await serve(makeRoutes({ listDelegatedSkins: () => [row(true)] }))
+
+    // When the selection is written
+    const post = await call(server.port, 'POST', `${SKIN_CENTER_V2_PREFIX}/active`, { body: { active: 'claude-style' } })
+
+    // Then it is stored, and read back as the active selection
+    expect(post.status).toBe(200)
+    expect(post.jsonBody.active).toBe('claude-style')
+    const get = await call(server.port, 'GET', `${SKIN_CENTER_V2_PREFIX}/active`)
+    expect(get.jsonBody.active).toBe('claude-style')
+    await server.close()
+  })
+
+  it('still refuses an id that names nothing at all', async () => {
+    // Given a selection no catalog row and no registry entry answers for
+    writeFixtureSkin('harbor')
+    const server = await serve(makeRoutes({ listDelegatedSkins: () => [row(true)] }))
+
+    // When it is written
+    const post = await call(server.port, 'POST', `${SKIN_CENTER_V2_PREFIX}/active`, { body: { active: 'not-a-skin' } })
+
+    // Then the write is refused
+    expect(post.status).toBe(404)
+    expect(post.jsonBody.error).toBe('skin-not-found')
     await server.close()
   })
 })

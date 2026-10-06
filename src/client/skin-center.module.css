@@ -68,6 +68,38 @@ body[data-dsh-skin-center] .cardBody {
   border-top: 1px solid var(--dsw-alias-border-l2);
 }
 
+/* Delegated skin row: a skin whose visual is another plugin's. It sits in the
+   skin grid with the rest, so it borrows the card shell and adds only the two
+   things that are its own: the kind badge on the thumbnail and the status line
+   that says whether that plugin can paint the page yet. The status line uses
+   the label tokens, not the warning ones: "not installed" is a state of the
+   row, not a problem with the skin list. */
+body[data-dsh-skin-center] .delegatedCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+body[data-dsh-skin-center] .delegatedBadge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--dsw-alias-brand-primary, #1e63b8);
+  background: var(--dsw-alias-bg-layer-3);
+  border: 1px solid var(--dsw-alias-border-l2);
+}
+
+body[data-dsh-skin-center] .delegatedStatus {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+}
+
 /* Delegated wallpaper plugin pointer (issue #39): a state notice that carries
    the recommended plugin's one-click install. It rides the warning state tokens
    rather than the brand accent, so it reads as a callout next to the skin list;

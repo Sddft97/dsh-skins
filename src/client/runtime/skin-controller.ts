@@ -34,11 +34,35 @@ import { buildBackgroundMedia, clearLayer, ensureDecorationLayers } from './deco
 import type { DecorationLayers } from './decoration-layers.ts'
 import { setSceneBackdropActive } from './backdrop-scene.ts'
 
+/**
+ * The delegated-plugin payload a delegated skin's catalog row carries.
+ *
+ * It is the whole of what the controller needs: the entry is recognized as a
+ * delegated skin by this field existing. Everything else on it is card copy and
+ * install wiring, and the controller reads none of it.
+ */
+export interface DelegatedSkinPayload {
+  /** npm package spec the card installs through the plugin manager. */
+  package: string
+  /** Upstream repository (docs, issues, changelog). */
+  repository: string
+  /** The attribute the delegated plugin stamps on body while it owns the page. */
+  bodyAttr: string
+  /** The attribute it stamps while it can hand the page back (capability). */
+  handoffAttr: string
+  /** Whether the delegated package is installed in this profile. */
+  installed: boolean
+}
+
 /** Catalog entry shape the controller needs (mirrors the v2 catalog route). */
 export interface ControllerSkinEntry {
   manifest: {
     id: string
-    contributes: {
+    /**
+     * Absent for a delegated skin: that plugin owns the stylesheet, the
+     * background and the visual, so this package loads none of them.
+     */
+    contributes?: {
       stylesheet: string
       patches?: string
       backgroundMedia?: {
@@ -46,8 +70,22 @@ export interface ControllerSkinEntry {
         dark?: { type: 'image' | 'video'; src: string; scrim?: string }
       }
     }
+    /** Present exactly for a delegated skin; absent for every asset skin. */
+    delegated?: DelegatedSkinPayload
     facets?: { client?: { entry: string; apiVersion: string } }
   }
+}
+
+/**
+ * Whether this entry's visual belongs to a delegated plugin.
+ *
+ * A delegated skin is a real selection, not a stand-down: it is persisted,
+ * adopted on boot, and shown as the active row. What it never does is paint.
+ * @param entry - a catalog entry, or null.
+ * @returns true when the entry is a delegated skin.
+ */
+export function isDelegatedEntry(entry: ControllerSkinEntry | null): boolean {
+  return entry?.manifest.delegated !== undefined
 }
 
 export interface SkinControllerDeps {
@@ -237,7 +275,7 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
     if (active === null || currentActivation === null || lastEntry === null) return
     // A withheld skin has no paint to repaint (issue #39).
     if (stoodDown) return
-    const media = lastEntry.manifest.contributes.backgroundMedia
+    const media = lastEntry.manifest.contributes?.backgroundMedia
     if (!media) return
     const variant = themeGet() === 'dark' ? (media.dark ?? media.light) : (media.light ?? media.dark)
     if (!variant) return
@@ -351,7 +389,7 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
     activation: number,
     entry: ControllerSkinEntry,
   ): void {
-    const media = entry.manifest.contributes.backgroundMedia
+    const media = entry.manifest.contributes?.backgroundMedia
     if (!media) {
       setBackgroundLayer(activation, [])
       return
@@ -445,12 +483,19 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
     // claim needs a skin to paint, so the stock look keeps reporting itself as
     // stood down rather than claiming a stage it does not use.
     const suppressed = deps.suppressSkin?.() === true
-    const claimsStage = options?.userInitiated === true && id !== null && entry !== null
+    // A delegated skin has no stylesheet of its own: the plugin that owns the
+    // page paints it. The activation is still a real one (it persists the
+    // selection and records the row as active), it simply paints nothing and
+    // leaves html[data-dsh-skin] off, which is the very signal that plugin
+    // reads to stand down. It never claims the stage: there is no paint to
+    // claim one with.
+    const delegated = isDelegatedEntry(entry)
+    const claimsStage = options?.userInitiated === true && id !== null && entry !== null && !delegated
     const withheld = suppressed && !claimsStage
     try {
-      if (!withheld && id !== null && entry !== null) {
+      if (!withheld && !delegated && id !== null && entry !== null) {
         const stylesheetHref = `${apiBase}/skins/${id}/stylesheet`
-        const patchesHref = entry.manifest.contributes.patches !== undefined
+        const patchesHref = entry.manifest.contributes?.patches !== undefined
           ? `${apiBase}/skins/${id}/patches`
           : null
         await loadStylesheet(stylesheetHref)
@@ -472,12 +517,16 @@ export function createSkinController(deps: SkinControllerDeps): SkinController {
 
       // The atomic cut: attribute first, then retire the old activation. A
       // withheld skin leaves the stamp off, which is what actually removes the
-      // skin's CSS from the page.
-      if (id === null || withheld) doc.documentElement.removeAttribute('data-dsh-skin')
+      // skin's CSS from the page. A delegated skin leaves it off for the same
+      // reason from the other side: its owner reads the stamp.
+      if (id === null || withheld || delegated) doc.documentElement.removeAttribute('data-dsh-skin')
       else doc.documentElement.setAttribute('data-dsh-skin', id)
       const previous = currentActivation
       currentActivation = activation
       active = id
+      // Stood down is only ever the EXTERNAL verdict: a wallpaper rendering
+      // over whatever is selected. A delegated skin on its own is not stood
+      // down, it is simply painted by its plugin rather than here.
       stoodDown = withheld
       // This activation already applied the current verdict, so refresh() must
       // not read it as a change and re-switch on the next call.
