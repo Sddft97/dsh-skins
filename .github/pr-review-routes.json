@@ -14,12 +14,12 @@
       "name": "renderer",
       "label": "Wallpaper Engine / WebGL / renderer",
       "paths": [
-        "src/we-*.ts",
-        "src/pkg-extract.ts",
-        "src/client/wallpaper.ts",
-        "src/client/WallpaperPanel.tsx"
+        "src/external-wallpaper.ts",
+        "src/client/external-wallpaper-*.ts",
+        "src/client/runtime/external-wallpaper-engine.ts",
+        "src/core/wallpaper-handoff.ts"
       ],
-      "title": "(wallpaper|webgl|scene player|scene runtime|pkg[-_ ]?extract|we[-_ ]?(library|routes|player|shim)|renderer)",
+      "title": "(wallpaper|webgl|renderer)",
       "reviewers": [],
       "assignees": [
         "Aa728848"
