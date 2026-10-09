@@ -1128,13 +1128,9 @@ body[data-ds-dark-theme] [data-slot="conversation.chat.node"] > [class*="_userRo
   text-align: start;
 }
 
-/* The running status is the one place the chapter language belongs: a gold rule
-   under the live line, with the sweep riding it. Marked by the hooks, so the
-   finished rows stay plain. */
-[data-pane="conversation"] [data-verdandi-running] {
-  border-bottom: 1px solid color-mix(in srgb, var(--vd-gold) 42%, transparent);
-}
-
+/* The running state used to add a gold rule under the live row. dsh 0.2.0 moved
+   the live status into a node of its own (`[data-chat-running]`), so the rule and
+   the marker it rode are gone — see the running-status note below. */
 
 [data-pane="conversation"] [data-turn-process] [class*="_label"] {
   position: relative;
@@ -1395,8 +1391,9 @@ body[data-ds-dark-theme] [data-slot="conversation.chat.node"] > [class*="_userRo
 }
 
 /* [P0 fix] Removed entire _turnStatus / _turnStatusClock block (was lines 1387-1429).
-   _turnStatus was removed in DSH 0.1.7; the replacement uses
-   [data-turn-process] + [data-verdandi-running] (see below). */
+   _turnStatus was removed in DSH 0.1.7, so those rules were dead. The contrast
+   measurements that shaped the bare-ink treatment live in the plugin form's
+   docs/design/verdandi-white-vow.md §15.7. */
 
 @supports not (backdrop-filter: blur(4px)) {
   [data-pane="conversation"] :is([data-verdandi-slip], [data-turn-process], [data-turn-tail] [class*="_actions"]:has([class*="_time"]), [data-clock="start"], [data-turn-trigger], [class*="_turnErrorRow"], [class*="_compactionRow"]), [data-pane="conversation"] :is([class*="_heroWorkspaceRow"], [class*="_workspaceRow"]) :is(button, [role="button"]) {
@@ -1441,48 +1438,33 @@ body[data-ds-dark-theme] [data-slot="conversation.chat.node"] > [class*="_userRo
   /* [P0 fix] removed dead _turnStatus / _turnStatusClock forced-colors rules */
 }
 
-/* dsh 0.1.7 hosts the live status inside the turn-process control and switches
-   that label's copy with the turn state (running / worked / took / failed), so
-   the copy swap is scoped by the running marker the hooks project rather than by
-   the removed `_turnStatus` class. Finished states keep the host's own wording;
-   while the turn runs the label reads as ink and the gold hairline under the row
-   carries the motion, which is why no surface is involved. The label's own wash
-   and padding are declared with the chapter rule above. */
+/* --- Running status: the host's own component, re-tinted ---------------- */
+
+/* dsh 0.2.0 mounts the live status as a node of its own — `[data-chat-running]`,
+   carrying the whale tail and a TextShimmer sweep for the motion — and paints it
+   from two tokens. The skin therefore contributes nothing but those two colours:
+   the ink is the same plain-ink token the readability guard already measures, and
+   the sweeping band is the skin's crimson, because a band that keeps its contrast
+   with the artwork reads as motion rather than as the word blinking.
+   What this replaces: collapse the host's label, restate the copy from a
+   pseudo-element, and draw a gold hairline under the row. That version was
+   anchored on a marker the 0.2.0 shell never grows, and the sweep it painted was
+   never the host's — both effects it imitated are native here.
+   Measured against the artwork band (§15.7): ink 5.18:1 light / 2.03:1 dark, and
+   the band 1.48:1 / 1.95:1. The band has to be the *soft* crimson, not the deep
+   one: deep crimson sits 1.52x away from the near-black ink, which on the light
+   artwork reads as one more shade of black rather than as a pass of colour, while
+   soft crimson steps 3.5x / 4.0x away (the host's own step is 1.68x / 1.42x). One
+   token covers both palettes because `--vd-crimson-soft` already flips with them. */
+[data-chat-running] {
+  --dsw-alias-label-deep-diving: var(--vd-bare-ink);
+  --dsw-alias-label-deep-diving-shimmer: var(--vd-crimson-soft);
+}
+
+/* The turn-process label is the chapter rule's business; it only wants the
+   host's halo off here. */
 [data-pane="conversation"] [data-turn-process] [class*="_label"] {
-  position: relative;
   text-shadow: none;
-}
-
-[data-verdandi-running] [class*="_label"] {
-  color: var(--vd-ink);
-  font-size: 0;
-}
-
-[data-verdandi-running] [class*="_label"]:before {
-  content: "薇儿烧烤中...";
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: .01em;
-}
-
-html:lang(en) [data-verdandi-running] [class*="_label"]:before {
-  content: "Verdandi is grilling...";
-}
-
-[data-verdandi-running] [class*="_label"]:after {
-  content: "";
-  position: absolute;
-  right: 0;
-  bottom: -8px;
-  left: 0;
-  height: 2px;
-  background-color: color-mix(in srgb, var(--vd-gold) 30%, transparent);
-  background-image: linear-gradient(90deg, transparent, var(--vd-gold-light), transparent);
-  background-repeat: no-repeat;
-  background-size: 38% 100%;
-  border-radius: 2px;
-  animation: 1.9s linear infinite vd-verdandi-status-sweep;
-  pointer-events: none;
 }
 
 [data-slot="conversation.chat.node"] :is([class*="_callRow"], [class*="_retryRow"]) [class*="_bodyWrap"] {
@@ -2018,16 +2000,6 @@ body[data-ds-dark-theme] [data-slot="sidebar.settings"] [role="dialog"][aria-mod
     transition-duration: .01ms !important;
     animation-duration: .01ms !important;
     animation-iteration-count: 1 !important;
-  }
-}
-
-@keyframes vd-verdandi-status-sweep {
-  0% {
-    background-position: -70% 0;
-  }
-
-  to {
-    background-position: 170% 0;
   }
 }
 
