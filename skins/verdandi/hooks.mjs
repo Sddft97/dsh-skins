@@ -104,6 +104,29 @@ const CONVERSATION_PHASE_ATTR = 'data-verdandi-phase'
 const CONVERSATION_VIEW_ATTR = 'data-verdandi-view'
 const DETAILS_EMPTY_ATTR = 'data-verdandi-details-empty'
 const SLIP_ATTR = 'data-verdandi-slip'
+/**
+ * The shell mounts its running status as a node of its own and paints it from its
+ * own pieces (a whale mark and a TextShimmer sweep). This skin takes that line
+ * over completely — icon, copy and sweep — so every name below is the skin's;
+ * the only shell identifiers involved are its `data-chat-running` marker and the
+ * running phrase itself.
+ *
+ * `RUNNING_PREFIX` is the whole contract: a phrase we know buys the replacement,
+ * an unknown one (a locale nobody wrote a prefix for) leaves the shell's own line
+ * exactly as it is rather than half-replaced. The skin's phrase and the shell's
+ * live-region string are the same words, so assistive tech keeps hearing the
+ * shell's own localization while the paint is ours.
+ */
+const RUNNING_HOST_SELECTOR = '[data-chat-running]'
+const RUNNING_BAR_ATTR = 'data-verdandi-running-bar'
+const RUNNING_LINE_ATTR = 'data-verdandi-running-line'
+const RUNNING_ICON_ATTR = 'data-verdandi-running-icon'
+const RUNNING_COPY_ATTR = 'data-verdandi-running-copy'
+const RUNNING_LIVE_ATTR = 'data-verdandi-running-a11y'
+const RUNNING_PREFIX = {
+  '深度求索中': '薇儿烧烤中',
+  'Deep diving': 'Verdandi is grilling',
+}
 const STAGE_SELECTOR = '[data-verdandi-stage]'
 const DECORATION_SELECTOR = '[data-verdandi-decoration]'
 const LEGACY_SELECTOR = '[data-verdandi-sidebar-card], [data-verdandi-wedding], [data-verdandi-chrome]'
@@ -137,6 +160,7 @@ const OWNED_HOOKS = [
   'data-verdandi-new-session',
   'data-verdandi-nav-entry',
   'data-verdandi-sidebar-action',
+  RUNNING_BAR_ATTR,
   DETAILS_EMPTY_ATTR,
 ]
 
@@ -209,8 +233,35 @@ function isRendered(element) {
   return style.display !== 'none' && style.visibility !== 'hidden'
 }
 
-function removeLegacyNodes() {
-  for (const node of document.querySelectorAll(LEGACY_SELECTOR)) node.remove()
+/**
+ * The shell's own running phrase, read off the deepest element that carries it.
+ * Text, not a class name: the shell's CSS-module names are build hashes and its
+ * markup is an implementation detail, while the phrase is the one thing the
+ * replacement has to recognise anyway. The shell's live region repeats the bare
+ * phrase, so the last match in document order is the visual line the timer lives in.
+ */
+function runningPhraseNode(host) {
+  let found = null
+  let phrase = ''
+  for (const node of host.querySelectorAll('*')) {
+    // our own line carries the phrase too (its live region repeats it verbatim),
+    // so it must never be mistaken for the shell's label
+    if (node.closest(`[${RUNNING_LINE_ATTR}]`) !== null) continue
+    if (node.children.length !== 0) continue
+    const text = (node.textContent ?? '').trim()
+    for (const candidate of Object.keys(RUNNING_PREFIX)) {
+      // the shell's live region carries the bare phrase and its label carries the
+      // phrase plus the live timer, so the longest match is the label
+      if (text.startsWith(candidate) && text.length > (found === null ? 0 : (found.textContent ?? '').trim().length)) {
+        found = node
+        phrase = candidate
+      }
+    }
+  }
+  return found === null ? null : { node: found, phrase }
+}
+
+function removeLegacyNodes() {  for (const node of document.querySelectorAll(LEGACY_SELECTOR)) node.remove()
 }
 
 function ensureDecoration(parent, part) {
@@ -460,6 +511,65 @@ export default function defineSkinHooks() {
         ? window.cancelAnimationFrame.bind(window)
         : window.clearTimeout.bind(window)
 
+      let runningObserver = null
+      let runningObservedNode = null
+      let runningFrame = 0
+
+      /**
+       * Paint the running line. Idempotent and cheap: called from the main sync and
+       * from the line's own observer, which is what keeps the shell's live timer
+       * (", 用时 20 秒 ···") ticking through the replacement. Fail closed — with no
+       * known phrase nothing is painted and the shell's own line stands.
+       */
+      const renderRunningLine = () => {
+        const host = document.querySelector(RUNNING_HOST_SELECTOR)
+        if (host === null) return
+        const found = runningPhraseNode(host)
+        if (found === null) return
+        const text = (found.node.textContent ?? '').trim()
+        const copy = RUNNING_PREFIX[found.phrase] + text.slice(found.phrase.length)
+
+        let line = host.querySelector(`:scope > [${RUNNING_LINE_ATTR}]`)
+        if (line === null) {
+          line = document.createElement('span')
+          line.setAttribute(RUNNING_LINE_ATTR, '')
+          const icon = document.createElement('span')
+          icon.setAttribute(RUNNING_ICON_ATTR, '')
+          const body = document.createElement('span')
+          body.setAttribute(RUNNING_COPY_ATTR, '')
+          const live = document.createElement('span')
+          live.setAttribute(RUNNING_LIVE_ATTR, '')
+          live.setAttribute('role', 'status')
+          live.setAttribute('aria-live', 'polite')
+          live.setAttribute('aria-atomic', 'true')
+          live.textContent = found.phrase
+          line.append(icon, body, live)
+          host.append(line)
+        }
+        // `clearOwnedHooks()` sweeps every owned attribute on each pass, so the
+        // marker is re-asserted here rather than only when the line is created
+        host.setAttribute(RUNNING_BAR_ATTR, '')
+        const body = line.querySelector(`[${RUNNING_COPY_ATTR}]`)
+        if (body !== null && body.textContent !== copy) body.textContent = copy
+        const live = line.querySelector(`[${RUNNING_LIVE_ATTR}]`)
+        if (live !== null && live.textContent !== found.phrase) live.textContent = found.phrase
+
+        if (runningObservedNode !== found.node) {
+          runningObserver?.disconnect()
+          runningObservedNode = found.node
+          runningObserver = new MutationObserver(scheduleRunningLine)
+          runningObserver.observe(found.node, { characterData: true, childList: true, subtree: true })
+        }
+      }
+
+      const scheduleRunningLine = () => {
+        if (runningFrame) return
+        runningFrame = requestFrame(() => {
+          runningFrame = 0
+          renderRunningLine()
+        })
+      }
+
       const syncResizeTargets = (targets) => {
         if (!resizeObserver) return
         const next = new Set(targets.filter((target) => Boolean(target)))
@@ -484,6 +594,7 @@ export default function defineSkinHooks() {
         setSidebarSize(body, sidebar)
         ensureWeddingDecorations(sidebar, workspaceVisible ? conversation : null, details)
         decorateLegibilityRows(workspaceVisible ? conversation : null)
+        renderRunningLine()
 
         if (workspaceVisible) {
           const stage = ensureCharacterStage(conversation)
@@ -530,6 +641,12 @@ export default function defineSkinHooks() {
       ctx.onCleanup(() => {
         mutationObserver.disconnect()
         resizeObserver?.disconnect()
+        runningObserver?.disconnect()
+        runningObserver = null
+        runningObservedNode = null
+        if (runningFrame) cancelFrame(runningFrame)
+        runningFrame = 0
+        for (const line of document.querySelectorAll(`[${RUNNING_LINE_ATTR}]`)) line.remove()
         if (animationFrame) cancelFrame(animationFrame)
         window.removeEventListener('resize', scheduleSync)
         window.visualViewport?.removeEventListener('resize', scheduleSync)
