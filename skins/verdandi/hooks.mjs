@@ -453,13 +453,25 @@ export default function defineSkinHooks() {
       // attribute created by the skin must not survive cleanup.
       const hadStyleAttribute = body.hasAttribute('style')
 
-      for (const [property, file] of Object.entries(ASSET_PROPERTIES)) {
-        previousAssetProperties.set(property, {
-          value: body.style.getPropertyValue(property),
-          priority: body.style.getPropertyPriority(property),
-        })
-        const source = file === null ? SVG_PROPERTIES[property] : asset(file)
-        body.style.setProperty(property, `url(${JSON.stringify(source)})`)
+      // Art URL variables (--vd-art-*) are now declared in skin.css :root
+      // instead of set through body.style.setProperty. This makes them
+      // immune to the skin-center double-activation cleanup bug where
+      // hooks cleanup removeProperty would clear variables set by a newer
+      // activation (the persisted-selection follower re-adopt path).
+      //
+      // We still snapshot any pre-existing inline values so cleanup can
+      // restore them (important when another skin left inline overrides
+      // that Verdandi should not clobber on exit), but we no longer set
+      // them ourselves — skin.css owns the cascade now.
+      for (const [property] of Object.entries(ASSET_PROPERTIES)) {
+        const existingValue = body.style.getPropertyValue(property)
+        const existingPriority = body.style.getPropertyPriority(property)
+        if (existingValue) {
+          previousAssetProperties.set(property, {
+            value: existingValue,
+            priority: existingPriority,
+          })
+        }
       }
       removeLegacyNodes()
 
