@@ -596,6 +596,25 @@ body[data-ds-dark-theme] .vd-characterFigure {
    an overlay lives in the tens or hundreds, so a decoration that outranks it will
    paint over the overlay -- reported once as the composer seal sitting on top of the
    model picker, which is also what put the seal below the composer's own content. */
+/* The shell's top bar is an Electron window-drag region: the header and its rows carry
+   `-webkit-app-region: drag` and each control opts out with `no-drag`. The property is
+   INHERITED, so every layer the skin mounts inside the header inherited `drag` and
+   re-declared the whole band -- including the area over the controls -- as draggable.
+   A real mouse press on 更多操作 or 打开右侧边栏 then started a window drag instead of
+   reaching the button; onlookers saw "the top bar is dead".
+
+   Nothing in-page can observe this: `elementFromPoint` skips these layers (they are
+   `pointer-events: none`) and CDP-injected clicks never enter the native drag path, so
+   both look perfectly healthy. The maid-atelier skin mounts the same band as a
+   body-level layer instead, which is why only this skin showed it.
+
+   The skin's own layers opt out; the shell's own drag rects are left untouched. */
+[data-verdandi-header] > [data-verdandi-decoration],
+[data-verdandi-header]::before,
+[data-verdandi-header]::after {
+  -webkit-app-region: no-drag;
+}
+
 [data-verdandi-header] {
   z-index: 4;
   box-shadow: inset 0 7px 0 var(--vd-crimson), inset 0 8px 0 #c7a86bdb, 0 5px 18px #400c1b1f;
