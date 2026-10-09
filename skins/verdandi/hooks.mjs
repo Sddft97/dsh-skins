@@ -264,6 +264,18 @@ function runningPhraseNode(host) {
 function removeLegacyNodes() {  for (const node of document.querySelectorAll(LEGACY_SELECTOR)) node.remove()
 }
 
+// True when the shell's own top bar is a native window-drag region. Chromium reports
+// `drag` where the host enables it (macOS today) and the initial `none` where it does
+// not (the `[data-platform="darwin"]` gate means a platform with a native title bar
+// never gets one). A value the environment cannot report at all -- jsdom in the tests
+// computes no such property -- is treated as "assume drag" so fixtures keep describing
+// the macOS shape.
+function shellUsesDragRegion(header) {
+  if (!header) return false
+  const region = getComputedStyle(header).webkitAppRegion
+  return region === 'drag' || region === '' || region == null
+}
+
 function ensureDecoration(parent, part) {
   if (!parent) return null
   let decoration = parent.querySelector(`:scope > [data-verdandi-decoration='${part}']`)
@@ -296,7 +308,16 @@ function ensureWeddingDecorations(sidebar, conversation, details) {
   // whole band out of the shell's own drag region. This strip gives dragging back
   // where the skin is decoration only: the empty middle of the bar, centred on the
   // crest, clear of every control.
-  ensureDecoration(header, 'header-drag-strip')
+  //
+  // Only where the shell actually uses that mechanism, though: its own drag-region
+  // rules are platform-gated (`[data-platform="darwin"]`), and a platform whose window
+  // has a native title bar leaves `-webkit-app-region` unused. Inventing a drag band
+  // there could swallow clicks in an area the host never reserved.
+  if (shellUsesDragRegion(header)) {
+    ensureDecoration(header, 'header-drag-strip')
+  } else {
+    header?.querySelector(`:scope > [data-verdandi-decoration='header-drag-strip']`)?.remove()
+  }
 
   const composer = conversation?.querySelector('[data-composer-card]') ?? null
   ensureDecoration(composer, 'composer-seal')
