@@ -615,6 +615,20 @@ body[data-ds-dark-theme] .vd-characterFigure {
   -webkit-app-region: no-drag;
 }
 
+/* ...except this one, which is the drag handle the skin owes back. It contributes its
+   own rect (minus its own no-drag descendants, of which it has none) and covers only
+   the empty middle of the bar, so no control is ever inside it. */
+[data-verdandi-header] > [data-verdandi-decoration="header-drag-strip"] {
+  -webkit-app-region: drag;
+  z-index: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 40%;
+  width: 20%;
+}
+
 [data-verdandi-header] {
   z-index: 4;
   box-shadow: inset 0 7px 0 var(--vd-crimson), inset 0 8px 0 #c7a86bdb, 0 5px 18px #400c1b1f;
