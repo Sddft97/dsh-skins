@@ -5,13 +5,15 @@
  * through ctx.onCleanup.
  *
  * Port of the v1 plugin effects (src/client/index.ts + ornaments.ts + art.ts):
- *  - v1 interpolated 27 inline image constants into body CSS variables. The 19
- *    raster constants now ship byte-identical as files under assets/ and are
- *    referenced through ctx.assetBase; the 6 SVG ornaments stay inline data
- *    URIs here because they are byte-identical by construction and the v2
- *    pipeline inlines served CSS into a <style> tag without rewriting relative
- *    url() (a relative assets/... URL there would resolve against the document
- *    base and 404). The variables therefore stay on body inline styles.
+ *  - v1 interpolated 27 inline image constants into body CSS variables. The
+ *    art variables are now declared by skin.css :root (the 19 raster constants
+ *    as assets/ URLs next to their byte-identical files, the 6 SVG ornaments
+ *    inlined as data URIs because the v2 pipeline inlines served CSS into a
+ *    <style> tag without rewriting relative url() -- a relative assets/...
+ *    URL there would resolve against the document base and 404). Declaring
+ *    them in :root instead of body.style.setProperty keeps them alive through
+ *    the skin-center double-activation cleanup bug; hooks only snapshots
+ *    pre-existing inline values so cleanup can restore them.
  *  - the theme token layer v1 installed through theme.overrideTokens is now a
  *    declarative L1 block in skin.css (same five tokens, same light/dark
  *    values), so this module subscribes to no theme events.
@@ -169,8 +171,10 @@ const layoutProperties = [
 
 /**
  * body CSS variable -> shipped asset under assets/. The property set and the
- * order are the v1 ASSET_PROPERTIES map verbatim; only the value source moved
- * from an inline data URI to a ctx.assetBase file URL.
+ * order are the v1 ASSET_PROPERTIES map verbatim. The values themselves are
+ * declared by skin.css :root (raster entries as assets/ URLs, the six SVG
+ * ornaments inlined); this map only names the properties the setup step
+ * snapshots and the cleanup step restores.
  */
 const ASSET_PROPERTIES = {
   '--vd-art-sidebar-bridal': 'verdandi-bridal-cg-portrait-v1.webp',
@@ -563,13 +567,25 @@ export default function defineSkinHooks() {
       // attribute created by the skin must not survive cleanup.
       const hadStyleAttribute = body.hasAttribute('style')
 
-      for (const [property, file] of Object.entries(ASSET_PROPERTIES)) {
-        previousAssetProperties.set(property, {
-          value: body.style.getPropertyValue(property),
-          priority: body.style.getPropertyPriority(property),
-        })
-        const source = file === null ? SVG_PROPERTIES[property] : asset(file)
-        body.style.setProperty(property, `url(${JSON.stringify(source)})`)
+      // Art URL variables (--vd-art-*) are declared in skin.css :root instead
+      // of set through body.style.setProperty. This makes them immune to the
+      // skin-center double-activation cleanup bug where hooks cleanup
+      // removeProperty would clear variables set by a newer activation (the
+      // persisted-selection follower re-adopt path).
+      //
+      // We still snapshot any pre-existing inline values so cleanup can
+      // restore them (important when another skin left inline overrides that
+      // Verdandi should not clobber on exit), but we no longer set them
+      // ourselves -- skin.css owns the cascade now.
+      for (const [property] of Object.entries(ASSET_PROPERTIES)) {
+        const existingValue = body.style.getPropertyValue(property)
+        const existingPriority = body.style.getPropertyPriority(property)
+        if (existingValue) {
+          previousAssetProperties.set(property, {
+            value: existingValue,
+            priority: existingPriority,
+          })
+        }
       }
       removeLegacyNodes()
 
