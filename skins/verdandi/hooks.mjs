@@ -5,13 +5,15 @@
  * through ctx.onCleanup.
  *
  * Port of the v1 plugin effects (src/client/index.ts + ornaments.ts + art.ts):
- *  - v1 interpolated 27 inline image constants into body CSS variables. The 19
- *    raster constants now ship byte-identical as files under assets/ and are
- *    referenced through ctx.assetBase; the 6 SVG ornaments stay inline data
- *    URIs here because they are byte-identical by construction and the v2
- *    pipeline inlines served CSS into a <style> tag without rewriting relative
- *    url() (a relative assets/... URL there would resolve against the document
- *    base and 404). The variables therefore stay on body inline styles.
+ *  - v1 interpolated 27 inline image constants into body CSS variables. The
+ *    art variables are now declared by skin.css :root (the 19 raster constants
+ *    as assets/ URLs next to their byte-identical files, the 6 SVG ornaments
+ *    inlined as data URIs because the v2 pipeline inlines served CSS into a
+ *    <style> tag without rewriting relative url() -- a relative assets/...
+ *    URL there would resolve against the document base and 404). Declaring
+ *    them in :root instead of body.style.setProperty keeps them alive through
+ *    the skin-center double-activation cleanup bug; hooks only snapshots
+ *    pre-existing inline values so cleanup can restore them.
  *  - the theme token layer v1 installed through theme.overrideTokens is now a
  *    declarative L1 block in skin.css (same five tokens, same light/dark
  *    values), so this module subscribes to no theme events.
@@ -105,17 +107,17 @@ const CONVERSATION_VIEW_ATTR = 'data-verdandi-view'
 const DETAILS_EMPTY_ATTR = 'data-verdandi-details-empty'
 const SLIP_ATTR = 'data-verdandi-slip'
 /**
- * The shell mounts its running status as a node of its own and paints it from its
+ * The host mounts its running status as a node of its own and paints it from its
  * own pieces (a whale mark and a TextShimmer sweep). This skin takes that line
- * over completely — icon, copy and sweep — so every name below is the skin's;
- * the only shell identifiers involved are its `data-chat-running` marker and the
+ * over completely - icon, copy and sweep - so every name below is the skin's; the
+ * only host identifiers involved are its `[data-chat-running]` marker and the
  * running phrase itself.
  *
  * `RUNNING_PREFIX` is the whole contract: a phrase we know buys the replacement,
- * an unknown one (a locale nobody wrote a prefix for) leaves the shell's own line
- * exactly as it is rather than half-replaced. The skin's phrase and the shell's
+ * an unknown one (a locale nobody wrote a prefix for) leaves the host's own line
+ * exactly as it is rather than half-replaced. The skin's phrase and the host's
  * live-region string are the same words, so assistive tech keeps hearing the
- * shell's own localization while the paint is ours.
+ * host's own localization while the paint is ours.
  */
 const RUNNING_HOST_SELECTOR = '[data-chat-running]'
 const RUNNING_BAR_ATTR = 'data-verdandi-running-bar'
@@ -127,13 +129,11 @@ const RUNNING_PREFIX = {
   '深度求索中': '薇儿烧烤中',
   'Deep diving': 'Verdandi is grilling',
 }
+const REGION_ATTR = 'data-verdandi-pane'
 const STAGE_SELECTOR = '[data-verdandi-stage]'
 const DECORATION_SELECTOR = '[data-verdandi-decoration]'
 const LEGACY_SELECTOR = '[data-verdandi-sidebar-card], [data-verdandi-wedding], [data-verdandi-chrome]'
 const SLIP_MARKER_SELECTOR = '[data-system-prompt-body], [data-context-source], [data-context-summary]'
-const SIDEBAR_PANE = "[data-pane='sidebar']"
-const CONVERSATION_PANE = "[data-pane='conversation']"
-const DETAILS_PANE = "[data-pane='details']"
 /**
  * The session header strip, in probe order. dsh 0.1.7 renders
  * `<div data-slot='conversation.header' style='display:contents'><header>` and
@@ -171,8 +171,10 @@ const layoutProperties = [
 
 /**
  * body CSS variable -> shipped asset under assets/. The property set and the
- * order are the v1 ASSET_PROPERTIES map verbatim; only the value source moved
- * from an inline data URI to a ctx.assetBase file URL.
+ * order are the v1 ASSET_PROPERTIES map verbatim. The values themselves are
+ * declared by skin.css :root (raster entries as assets/ URLs, the six SVG
+ * ornaments inlined); this map only names the properties the setup step
+ * snapshots and the cleanup step restores.
  */
 const ASSET_PROPERTIES = {
   '--vd-art-sidebar-bridal': 'verdandi-bridal-cg-portrait-v1.webp',
@@ -189,6 +191,7 @@ const ASSET_PROPERTIES = {
   '--vd-art-official-sacred-tree': 'verdandi-sacred-tree-white-v1.webp',
   '--vd-art-vow-avatar-frame': 'verdandi-vow-avatar-frame-v1.webp',
   '--vd-art-wedding-avatar': 'verdandi-wedding-avatar-v1.webp',
+  '--vd-art-bridal-avatar-framed': 'verdandi-bridal-avatar-framed-v1.webp',
   '--vd-art-vow-rings': 'verdandi-vow-rings-v1.webp',
   '--vd-art-ring-tag': 'verdandi-ring-tag-v1.webp',
   '--vd-art-vow-namecard': 'verdandi-vow-namecard-v1.webp',
@@ -197,6 +200,7 @@ const ASSET_PROPERTIES = {
   '--vd-art-childhood-record': 'verdandi-childhood-record-v1.webp',
   '--vd-art-sequence-sword': 'verdandi-sequence-sword-v1.webp',
   '--vd-art-q-avatar': 'verdandi-q-avatar-v1.webp',
+  '--vd-art-q-avatar-framed': 'verdandi-q-avatar-framed-v1.webp',
   '--vd-art-bridal-floral-corner': 'verdandi-bridal-floral-corner-v1.webp',
   '--vd-art-bridal-veil-corner': 'verdandi-bridal-veil-corner-v1.webp',
   '--vd-art-vow-folder': 'verdandi-vow-folder-v1.webp',
@@ -218,6 +222,37 @@ function firstElement(selector) {
   return document.querySelector(selector)
 }
 
+/**
+ * The DSH 0.2 shell composes its panes from new structure and keeps the legacy
+ * `data-pane` attributes only on some nodes, so each region is resolved through
+ * candidate selectors in probe order and stamped with the skin's own
+ * `data-verdandi-pane` marker - the anchor every 0.2-era rule keys on.
+ */
+const REGION_SELECTORS = {
+  sidebar: ["[data-pane='sidebar']", "[class*='_sidebarCol']", ":has(> [data-slot='sidebar'])"],
+  conversation: ["[data-pane='conversation']", "[data-slot='main.conversation'] > *", ":has(> [data-slot='conversation.header'])"],
+  details: ["[data-pane='details']", '[data-sidebar-right-panel]', "[data-slot='rightbar'] > *"],
+}
+
+function resolveRegions() {
+  const regions = { sidebar: null, conversation: null, details: null }
+  for (const name of Object.keys(REGION_SELECTORS)) {
+    let found = null
+    for (const selector of REGION_SELECTORS[name]) {
+      found = Array.from(document.querySelectorAll(selector))
+        .find((element) => window.getComputedStyle(element).display !== 'contents') ?? null
+      if (found) break
+    }
+    // The right panel stays mounted as a transparent overlay while closed.
+    if (name === 'details' && (!isRendered(found)
+      || (found.hasAttribute('data-sidebar-right-panel') && !found.hasAttribute('data-sidebar-right-open')))) {
+      found = null
+    }
+    regions[name] = found
+  }
+  return regions
+}
+
 function headerElement(root) {
   if (!root) return null
   for (const selector of HEADER_SELECTORS) {
@@ -233,26 +268,30 @@ function isRendered(element) {
   return style.display !== 'none' && style.visibility !== 'hidden'
 }
 
+function removeLegacyNodes() {
+  for (const node of document.querySelectorAll(LEGACY_SELECTOR)) node.remove()
+}
+
 /**
- * The shell's own running phrase, read off the deepest element that carries it.
- * Text, not a class name: the shell's CSS-module names are build hashes and its
+ * The host's own running phrase, read off the deepest element that carries it.
+ * Text, not a class name: the host's CSS-module names are build hashes and its
  * markup is an implementation detail, while the phrase is the one thing the
- * replacement has to recognise anyway. The shell's live region repeats the bare
- * phrase, so the last match in document order is the visual line the timer lives in.
+ * replacement has to recognise anyway.
  */
 function runningPhraseNode(host) {
   let found = null
   let phrase = ''
   for (const node of host.querySelectorAll('*')) {
     // our own line carries the phrase too (its live region repeats it verbatim),
-    // so it must never be mistaken for the shell's label
+    // so it must never be mistaken for the host's label
     if (node.closest(`[${RUNNING_LINE_ATTR}]`) !== null) continue
     if (node.children.length !== 0) continue
     const text = (node.textContent ?? '').trim()
     for (const candidate of Object.keys(RUNNING_PREFIX)) {
-      // the shell's live region carries the bare phrase and its label carries the
+      // the host's live region carries the bare phrase and its label carries the
       // phrase plus the live timer, so the longest match is the label
-      if (text.startsWith(candidate) && text.length > (found === null ? 0 : (found.textContent ?? '').trim().length)) {
+      const longest = found === null ? 0 : ((found.textContent ?? '').trim().length)
+      if (text.startsWith(candidate) && text.length > longest) {
         found = node
         phrase = candidate
       }
@@ -261,15 +300,15 @@ function runningPhraseNode(host) {
   return found === null ? null : { node: found, phrase }
 }
 
-function removeLegacyNodes() {  for (const node of document.querySelectorAll(LEGACY_SELECTOR)) node.remove()
-}
-
-// True when the shell's own top bar is a native window-drag region. Chromium reports
-// `drag` where the host enables it (macOS today) and the initial `none` where it does
-// not (the `[data-platform="darwin"]` gate means a platform with a native title bar
-// never gets one). A value the environment cannot report at all -- jsdom in the tests
-// computes no such property -- is treated as "assume drag" so fixtures keep describing
-// the macOS shape.
+/**
+ * True when the shell's own top bar is a native window-drag region. Chromium
+ * reports `drag` where the host enables it (macOS today) and the initial `none`
+ * where it does not -- the host's own rules are gated on
+ * `[data-platform="darwin"]`, so a platform whose window has a native title bar
+ * never gets one. A value the environment cannot report at all (jsdom in the
+ * tests computes no such property) counts as "assume drag" so fixtures keep
+ * describing the macOS shape.
+ */
 function shellUsesDragRegion(header) {
   if (!header) return false
   const region = getComputedStyle(header).webkitAppRegion
@@ -310,9 +349,9 @@ function ensureWeddingDecorations(sidebar, conversation, details) {
   // crest, clear of every control.
   //
   // Only where the shell actually uses that mechanism, though: its own drag-region
-  // rules are platform-gated (`[data-platform="darwin"]`), and a platform whose window
-  // has a native title bar leaves `-webkit-app-region` unused. Inventing a drag band
-  // there could swallow clicks in an area the host never reserved.
+  // rules are platform-gated (`[data-platform="darwin"]`), and a platform whose
+  // window has a native title bar leaves `-webkit-app-region` unused. Inventing a
+  // drag band there could swallow clicks in an area the host never reserved.
   if (shellUsesDragRegion(header)) {
     ensureDecoration(header, 'header-drag-strip')
   } else {
@@ -372,12 +411,25 @@ function ensureCharacterStage(conversation) {
   return stage
 }
 
-function clearOwnedHooks() {
+function clearOwnedHooks(root = document) {
   for (const attribute of OWNED_HOOKS) {
-    for (const element of document.querySelectorAll(`[${attribute}]`)) {
+    if (root instanceof HTMLElement) root.removeAttribute(attribute)
+    for (const element of root.querySelectorAll(`[${attribute}]`)) {
       element.removeAttribute(attribute)
     }
   }
+}
+
+function releaseRegion(region) {
+  clearOwnedHooks(region)
+  region.removeAttribute(REGION_ATTR)
+  region.removeAttribute(CONVERSATION_PHASE_ATTR)
+  region.removeAttribute(CONVERSATION_VIEW_ATTR)
+  for (const property of layoutProperties) region.style.removeProperty(property)
+  for (const node of region.querySelectorAll(`${DECORATION_SELECTOR}, ${STAGE_SELECTOR}, [${RUNNING_LINE_ATTR}]`)) {
+    node.remove()
+  }
+  for (const node of region.querySelectorAll(`[${SLIP_ATTR}]`)) node.removeAttribute(SLIP_ATTR)
 }
 
 /**
@@ -410,19 +462,20 @@ function decorateLegibilityRows(conversation) {
   }
 }
 
-function decorateStableRegions() {
+function decorateStableRegions(regions) {
   clearOwnedHooks()
 
-  const header = headerElement(document)
+  const header = headerElement(regions.conversation)
   header?.setAttribute('data-verdandi-header', '')
 
-  const details = firstElement(DETAILS_PANE)
+  const details = regions.details
   const detailsText = (details?.textContent ?? '').replace(/\s+/g, ' ').trim()
-  if (/点击消息流中的工具行查看详情|select.+tool.+row.+details/i.test(detailsText)) {
+  if (details?.querySelector('[data-dockkit-empty]')
+    || /点击消息流中的工具行查看详情|select.+tool.+row.+details|^空面板$|^Empty pane$/i.test(detailsText)) {
     details?.setAttribute(DETAILS_EMPTY_ATTR, '')
   }
 
-  const sidebar = firstElement(SIDEBAR_PANE)
+  const sidebar = regions.sidebar
   if (!sidebar) return
 
   for (const button of sidebar.querySelectorAll('button')) {
@@ -486,6 +539,13 @@ function setConversationView(conversation) {
   return view
 }
 
+function conversationPhase(conversation) {
+  return conversation.getAttribute('data-phase')
+    || conversation.querySelector('[data-content-phase]')?.getAttribute('data-content-phase')
+    || conversation.querySelector('[data-phase]')?.getAttribute('data-phase')
+    || 'active'
+}
+
 function restoreAttribute(element, name, previous) {
   if (previous === null) element.removeAttribute(name)
   else element.setAttribute(name, previous)
@@ -507,16 +567,16 @@ export default function defineSkinHooks() {
       // attribute created by the skin must not survive cleanup.
       const hadStyleAttribute = body.hasAttribute('style')
 
-      // Art URL variables (--vd-art-*) are now declared in skin.css :root
-      // instead of set through body.style.setProperty. This makes them
-      // immune to the skin-center double-activation cleanup bug where
-      // hooks cleanup removeProperty would clear variables set by a newer
-      // activation (the persisted-selection follower re-adopt path).
+      // Art URL variables (--vd-art-*) are declared in skin.css :root instead
+      // of set through body.style.setProperty. This makes them immune to the
+      // skin-center double-activation cleanup bug where hooks cleanup
+      // removeProperty would clear variables set by a newer activation (the
+      // persisted-selection follower re-adopt path).
       //
       // We still snapshot any pre-existing inline values so cleanup can
-      // restore them (important when another skin left inline overrides
-      // that Verdandi should not clobber on exit), but we no longer set
-      // them ourselves — skin.css owns the cascade now.
+      // restore them (important when another skin left inline overrides that
+      // Verdandi should not clobber on exit), but we no longer set them
+      // ourselves -- skin.css owns the cascade now.
       for (const [property] of Object.entries(ASSET_PROPERTIES)) {
         const existingValue = body.style.getPropertyValue(property)
         const existingPriority = body.style.getPropertyPriority(property)
@@ -532,6 +592,7 @@ export default function defineSkinHooks() {
       let resizeObserver = null
       let observed = new Set()
       let animationFrame = 0
+      let regions = { sidebar: null, conversation: null, details: null }
       const requestFrame = typeof window.requestAnimationFrame === 'function'
         ? window.requestAnimationFrame.bind(window)
         : (callback) => window.setTimeout(() => callback(Date.now()), 0)
@@ -545,12 +606,12 @@ export default function defineSkinHooks() {
 
       /**
        * Paint the running line. Idempotent and cheap: called from the main sync and
-       * from the line's own observer, which is what keeps the shell's live timer
+       * from the line's own observer, which is what keeps the host's live timer
        * (", 用时 20 秒 ···") ticking through the replacement. Fail closed — with no
-       * known phrase nothing is painted and the shell's own line stands.
+       * known phrase nothing is painted and the host's own line stands.
        */
       const renderRunningLine = () => {
-        const host = document.querySelector(RUNNING_HOST_SELECTOR)
+        const host = regions.conversation?.querySelector(RUNNING_HOST_SELECTOR) ?? null
         if (host === null) return
         const found = runningPhraseNode(host)
         if (found === null) return
@@ -574,9 +635,10 @@ export default function defineSkinHooks() {
           line.append(icon, body, live)
           host.append(line)
         }
-        // `clearOwnedHooks()` sweeps every owned attribute on each pass, so the
-        // marker is re-asserted here rather than only when the line is created
+        // `clearOwnedHooks()` sweeps every owned attribute on each pass, so the marker
+        // is re-asserted here rather than only when the line is created
         host.setAttribute(RUNNING_BAR_ATTR, '')
+
         const body = line.querySelector(`[${RUNNING_COPY_ATTR}]`)
         if (body !== null && body.textContent !== copy) body.textContent = copy
         const live = line.querySelector(`[${RUNNING_LIVE_ATTR}]`)
@@ -610,11 +672,16 @@ export default function defineSkinHooks() {
       const sync = () => {
         animationFrame = 0
         removeLegacyNodes()
-        decorateStableRegions()
+        const nextRegions = resolveRegions()
+        for (const name of Object.keys(nextRegions)) {
+          const previous = regions[name]
+          if (previous && previous !== nextRegions[name]) releaseRegion(previous)
+          nextRegions[name]?.setAttribute(REGION_ATTR, name)
+        }
+        regions = nextRegions
+        decorateStableRegions(regions)
 
-        const sidebar = firstElement(SIDEBAR_PANE)
-        const conversation = firstElement(CONVERSATION_PANE)
-        const details = firstElement(DETAILS_PANE)
+        const { sidebar, conversation, details } = regions
         const workspaceVisible = isRendered(conversation)
 
         body.toggleAttribute(WORKSPACE_ATTR, workspaceVisible)
@@ -626,7 +693,7 @@ export default function defineSkinHooks() {
 
         if (workspaceVisible) {
           const stage = ensureCharacterStage(conversation)
-          const phase = conversation.querySelector('[data-phase]')?.getAttribute('data-phase') ?? 'active'
+          const phase = conversationPhase(conversation)
           setConversationView(conversation)
           stage.dataset.verdandiPhase = phase
           conversation.setAttribute(CONVERSATION_PHASE_ATTR, phase)
@@ -634,7 +701,7 @@ export default function defineSkinHooks() {
           setStageWidth(stage, conversation)
         } else {
           for (const stage of document.querySelectorAll(STAGE_SELECTOR)) stage.remove()
-          for (const pane of document.querySelectorAll(CONVERSATION_PANE)) {
+          for (const pane of document.querySelectorAll(`[${REGION_ATTR}='conversation']`)) {
             pane.removeAttribute(CONVERSATION_PHASE_ATTR)
             pane.removeAttribute(CONVERSATION_VIEW_ATTR)
           }
@@ -660,7 +727,7 @@ export default function defineSkinHooks() {
         childList: true,
         subtree: true,
         attributes: true,
-        attributeFilter: ['aria-expanded', 'aria-selected', 'data-phase', 'hidden'],
+        attributeFilter: ['aria-expanded', 'aria-selected', 'aria-hidden', 'data-phase', 'data-content-phase', 'hidden', 'data-sidebar-right-open'],
       })
       window.addEventListener('resize', scheduleSync)
       window.visualViewport?.addEventListener('resize', scheduleSync)
@@ -683,11 +750,7 @@ export default function defineSkinHooks() {
         for (const decoration of document.querySelectorAll(DECORATION_SELECTOR)) decoration.remove()
         for (const slip of document.querySelectorAll(`[${SLIP_ATTR}]`)) slip.removeAttribute(SLIP_ATTR)
         for (const stage of document.querySelectorAll(STAGE_SELECTOR)) stage.remove()
-        for (const conversation of document.querySelectorAll(CONVERSATION_PANE)) {
-          for (const property of layoutProperties) conversation.style.removeProperty(property)
-          conversation.removeAttribute(CONVERSATION_PHASE_ATTR)
-          conversation.removeAttribute(CONVERSATION_VIEW_ATTR)
-        }
+        for (const region of Object.values(regions)) if (region) releaseRegion(region)
 
         for (const [property, previous] of previousAssetProperties) {
           if (previous.value) body.style.setProperty(property, previous.value, previous.priority)
